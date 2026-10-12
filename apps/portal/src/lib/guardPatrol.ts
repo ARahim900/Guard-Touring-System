@@ -13,9 +13,14 @@ export interface PatrolCheckpoint {
   latitude: number;
   longitude: number;
 }
-export interface PatrolSnapshot { shift: Shift | null; checkpoints: PatrolCheckpoint[]; updatedAt: string }
+export interface PatrolSnapshot { guardNames: string[]; shift: Shift | null; checkpoints: PatrolCheckpoint[]; updatedAt: string }
 
 export async function fetchPatrol(userId: string): Promise<PatrolSnapshot> {
+  const { error: preparationError } = await supabase.rpc('prepare_my_patrol').abortSignal(AbortSignal.timeout(15000));
+  if (preparationError) throw preparationError;
+  const roster = await supabase.from('app_settings').select('guard_names').eq('id', 1).single<{ guard_names: string[] }>();
+  if (roster.error) throw roster.error;
+  const guardNames = roster.data.guard_names;
   const { data, error } = await supabase.from('shifts')
     .select('id, guard_id, route_id, scheduled_start, scheduled_end, actual_start, actual_end, auto_closed_at, status, notes, on_duty_name, on_duty_ref, routes(name)')
     .eq('guard_id', userId).in('status', ['active', 'scheduled'])
@@ -23,12 +28,12 @@ export async function fetchPatrol(userId: string): Promise<PatrolSnapshot> {
     .limit(100).returns<Shift[]>().abortSignal(AbortSignal.timeout(15000));
   if (error) throw error;
   const shift = data?.find((item) => item.status === 'active') ?? data?.[0] ?? null;
-  if (!shift) return { shift: null, checkpoints: [], updatedAt: new Date().toISOString() };
+  if (!shift) return { guardNames, shift: null, checkpoints: [], updatedAt: new Date().toISOString() };
   const checkpoints = await supabase.from('shift_checkpoint_status')
     .select('checkpoint_id, checkpoint_name, code, sequence, completed, validation, scanned_at, latitude, longitude')
     .eq('shift_id', shift.id).order('sequence').returns<PatrolCheckpoint[]>().abortSignal(AbortSignal.timeout(15000));
   if (checkpoints.error) throw checkpoints.error;
-  return { shift, checkpoints: checkpoints.data ?? [], updatedAt: new Date().toISOString() };
+  return { guardNames, shift, checkpoints: checkpoints.data ?? [], updatedAt: new Date().toISOString() };
 }
 
 export async function submitReceipt(receipt: PatrolReceipt): Promise<ScanVerdict> {

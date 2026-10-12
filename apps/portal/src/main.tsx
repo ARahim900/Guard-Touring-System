@@ -15,7 +15,6 @@ import { Spinner } from '@/components/ui';
 import { AlarmProvider } from '@/context/AlarmContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { env } from '@/lib/env';
-import DashboardPage from '@/pages/Dashboard';
 import LoginPage from '@/pages/Login';
 import PrivacyPage from '@/pages/Privacy';
 
@@ -60,13 +59,14 @@ const router = createBrowserRouter([
   { path: '/privacy', element: <PrivacyPage /> }, // public: linked from the app stores
   {
     element: <RequireAccount />,
+    errorElement: <div className="mx-auto max-w-md space-y-4 p-6"><h1 className="text-xl">Please reload the app</h1><p>The app may have updated, or the connection was interrupted. Scans saved on this phone are kept.</p><button className="rounded-md bg-primary px-5 py-3 text-white" onClick={() => window.location.reload()}>Reload app</button></div>,
     children: [
       { path: 'guard', lazy: page(() => import('@/pages/GuardPatrol')) },
       { element: <RequireStaff />, children: [
       {
         element: <Layout />,
         children: [
-          { index: true, element: <DashboardPage /> },
+          { index: true, lazy: page(() => import('@/pages/PatrolHome')) },
           { path: 'live', lazy: page(() => import('@/pages/LiveMap')) },
           { path: 'alarms', lazy: page(() => import('@/pages/Alarms')) },
           { path: 'incidents', lazy: page(() => import('@/pages/Incidents')) },
