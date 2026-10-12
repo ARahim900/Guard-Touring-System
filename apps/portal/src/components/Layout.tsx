@@ -13,11 +13,11 @@ export function Layout() {
     <div className="flex min-h-full flex-col bg-background">
       <header className="bg-primary px-4 py-4 text-white sm:px-6">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <NavLink to="/" className="flex items-center gap-3 font-semibold">
+          <NavLink to="/" className="flex shrink-0 items-center gap-3 font-semibold">
             <img src="/apple-touch-icon.png" alt="Muscat Bay" className="size-10 rounded-md" />MB Patrol
           </NavLink>
-          <details className="text-right text-sm">
-            <summary className="cursor-pointer">{profile?.full_name}</summary>
+          <details className="min-w-0 max-w-[50%] text-right text-sm">
+            <summary title={profile?.full_name} className="cursor-pointer truncate">{profile?.full_name}</summary>
             <button onClick={() => void signOut()} className="mt-2 min-h-11 underline">Sign out</button>
           </details>
         </div>

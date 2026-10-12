@@ -93,15 +93,15 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
       {pending.length ? <p className="text-sm">{pending.length} scan(s) are saved on this phone but not confirmed by Supabase. Keep this app open with internet access to upload. Do not clear this site's data.</p> : null}
       {!shift ? <div className="space-y-2 border-y border-border py-6"><h2 className="text-lg">Your patrol is not ready yet</h2><p>Your manager needs to save Night patrol setup and add the locations. After that, patrols appear automatically each night.</p></div> : (
         <>
-          <section className="space-y-3 border-y border-border py-5">
+          <section className="space-y-4 rounded-xl border border-border bg-card p-5">
             <h2 className="text-xl">Night patrol</h2>
             <p className="text-sm">{formatDateTime(shift.scheduled_start)} – {formatDateTime(shift.scheduled_end)} · Muscat time</p>
-            <p className="font-semibold">{complete} of {checkpoints.length} locations visited</p>
+            <div className="rounded-lg bg-secondary-light p-4"><p className="text-2xl font-semibold text-primary">{complete}<span className="text-base font-normal"> / {checkpoints.length} locations</span></p><p className="mt-1 text-sm text-primary">{complete === checkpoints.length && checkpoints.length > 0 ? 'All locations verified for this shift' : 'Scan each location once to complete your round'}</p>{checkpoints.length > 0 ? <progress aria-label="Locations verified" className="mt-3 h-2 w-full appearance-none [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary" value={complete} max={checkpoints.length} /> : null}</div>
             {shift.status === 'scheduled' ? (
               <div className="space-y-3">
-                <Field label="Guard on duty"><Select value={name} onChange={(event) => setName(event.target.value)}><option value="">Choose your name</option>{snapshot?.guardNames?.map((guard) => <option key={guard} value={guard}>{guard}</option>)}</Select></Field>
+                <Field label="Guard on duty"><Select className="min-h-12 text-base" value={name} onChange={(event) => setName(event.target.value)}><option value="">Choose your name</option>{snapshot?.guardNames?.map((guard) => <option key={guard} value={guard}>{guard}</option>)}</Select></Field>
                 {!inWindow ? <p className="text-sm">Scanning opens at {formatTime(shift.scheduled_start)}. Your patrol is already prepared.</p> : null}
-                <Button className="min-h-12 w-full" loading={busy} disabled={syncing || !inWindow} onClick={() => void startScanning()}>Start scanning</Button>
+                <Button className="min-h-12 w-full" loading={busy} icon={ScanLine} disabled={syncing || !inWindow || !name} onClick={() => void startScanning()}>Start scanning</Button>
               </div>
             ) : (
               <>
@@ -113,7 +113,7 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
           </section>
           {scanning ? <PatrolScanner onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
           <section>
-            <h2 className="mb-3 text-lg">Locations to visit</h2>
+            <h2 className="mb-3 text-lg">Your locations</h2>
             {!checkpoints.length ? <p>Your manager needs to add the patrol locations.</p> : null}
             <ul className="divide-y divide-border">
               {checkpoints.map((checkpoint) => {
