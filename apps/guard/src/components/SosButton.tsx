@@ -28,7 +28,7 @@ const HOLD_MS = 2000;
 function offerCall(title: string, message: string) {
   const buttons: { text: string; onPress?: () => void; style?: 'cancel' }[] = [{ text: 'OK', style: 'cancel' }];
   if (env.controlRoomPhone) {
-    buttons.unshift({ text: 'Call control room', onPress: () => void Linking.openURL(`tel:${env.controlRoomPhone}`) });
+    buttons.unshift({ text: 'Call control room (2485 7781)', onPress: () => void Linking.openURL(`tel:${env.controlRoomPhone}`) });
   }
   Alert.alert(title, message, buttons);
 }

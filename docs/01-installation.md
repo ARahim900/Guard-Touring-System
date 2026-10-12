@@ -158,7 +158,7 @@ eas init                        # creates the Expo project and prints its ID
 ```bash
 eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_URL --value https://zdezuylsruzbddqcdhog.supabase.co --visibility plaintext
 eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <anon key> --visibility plaintext
-eas env:create --environment development --name EXPO_PUBLIC_CONTROL_ROOM_PHONE --value +968XXXXXXXX --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_CONTROL_ROOM_PHONE --value +96824857781 --visibility plaintext
 # Optional crash reporting:
 eas env:create --environment development --name EXPO_PUBLIC_SENTRY_DSN --value <dsn> --visibility plaintext
 eas env:create --environment development --name SENTRY_AUTH_TOKEN --value <token> --visibility secret

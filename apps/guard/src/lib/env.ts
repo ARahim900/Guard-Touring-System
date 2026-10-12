@@ -14,5 +14,6 @@ export const env = {
   supabaseUrl: required('EXPO_PUBLIC_SUPABASE_URL', process.env.EXPO_PUBLIC_SUPABASE_URL),
   supabaseAnonKey: required('EXPO_PUBLIC_SUPABASE_ANON_KEY', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
   sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
-  controlRoomPhone: process.env.EXPO_PUBLIC_CONTROL_ROOM_PHONE ?? '',
+  // Muscat Bay security control room (landline 2485 7781). Can be overridden per build.
+  controlRoomPhone: process.env.EXPO_PUBLIC_CONTROL_ROOM_PHONE || '+96824857781',
 };
