@@ -29,9 +29,11 @@ export default function ReportsPage() {
     try {
       const data = unwrap(await supabase.rpc('contractor_report', { p_contractor_id: contractorId, p_month: `${month}-01` })) as ReportRow[];
       const guardIds = data.map((r) => r.guard_id);
+      // Month boundaries in Muscat time (midnight on the 1st, UTC+4).
+      const [y, m] = month.split('-').map(Number);
+      const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
       const from = new Date(`${month}-01T00:00:00+04:00`);
-      const to = new Date(from);
-      to.setUTCMonth(to.getUTCMonth() + 1);
+      const to = new Date(`${next}-01T00:00:00+04:00`);
       const inc = guardIds.length
         ? (unwrap(
             await supabase

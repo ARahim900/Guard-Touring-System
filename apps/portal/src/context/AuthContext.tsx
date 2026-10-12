@@ -13,6 +13,9 @@ interface AuthValue {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  /** Set when the server could not be reached at start-up (no sign-out happens). */
+  loadError: string | null;
+  retry: () => void;
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -21,9 +24,14 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue | null>(null);
 
 async function loadProfile(userId: string) {
-  const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (error) throw error; // network/server problem: NOT a reason to sign anyone out
   return (data as Profile | null) ?? null;
 }
+
+// scope 'local' signs out this browser only. The default ('global') would also
+// sign the same person out of the guard app on their phone, mid-patrol.
+const signOutHere = () => supabase.auth.signOut({ scope: 'local' });
 
 const isStaff = (p: Profile | null) => Boolean(p && p.active && (p.role === 'supervisor' || p.role === 'admin'));
 
@@ -31,18 +39,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
+  const boot = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    const { data } = await supabase.auth.getSession();
+    try {
       const p = data.session ? await loadProfile(data.session.user.id) : null;
       if (data.session && !isStaff(p)) {
-        await supabase.auth.signOut();
+        await signOutHere();
       } else {
         setSession(data.session);
         setProfile(p);
       }
-      setLoading(false);
-    });
+    } catch (e) {
+      setLoadError(friendlyError(e));
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void boot();
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === 'SIGNED_OUT') {
         setSession(null);
@@ -52,14 +70,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [boot]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     if (error || !data.session) return friendlyError(error, 'Could not sign in.');
-    const p = await loadProfile(data.session.user.id);
+    let p: Profile | null;
+    try {
+      p = await loadProfile(data.session.user.id);
+    } catch (e) {
+      return friendlyError(e);
+    }
     if (!isStaff(p)) {
-      await supabase.auth.signOut();
+      await signOutHere();
       return 'This portal is for supervisors and admins only.';
     }
     setSession(data.session);
@@ -68,12 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await signOutHere();
   }, []);
 
   const value = useMemo(
-    () => ({ session, profile, loading, isAdmin: profile?.role === 'admin', signIn, signOut }),
-    [session, profile, loading, signIn, signOut],
+    () => ({ session, profile, loading, loadError, retry: () => void boot(), isAdmin: profile?.role === 'admin', signIn, signOut }),
+    [session, profile, loading, loadError, boot, signIn, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

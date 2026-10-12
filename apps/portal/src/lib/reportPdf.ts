@@ -115,36 +115,43 @@ export function buildReportPdf(input: ReportInput): jsPDF {
       r.rejected_scans,
     ]),
     foot: [['Total', '', t.shifts, t.shiftsMissed, t.expected, t.completed, pct(t.completion), t.onTime, pct(t.punctuality), t.incidents, t.sos, t.rejected]],
+    showFoot: 'lastPage', // the Total row only once, at the end
     theme: 'grid',
     styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2 },
     headStyles: { fillColor: PRIMARY, textColor: 255 },
     footStyles: { fillColor: [232, 241, 239], textColor: PRIMARY, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [247, 248, 249] },
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 24 }, // room for the footer and definitions
   });
 
   // ---- Incidents
   const afterTable = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  // Start the incidents section on a new page if it would collide with the footer.
+  let y = afterTable + 10;
+  if (y > doc.internal.pageSize.getHeight() - 40) {
+    doc.addPage();
+    y = 20;
+  }
   doc.setTextColor(...PRIMARY);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text(`Incidents reported (${input.incidents.length})`, 14, afterTable + 10);
+  doc.text(`Incidents reported (${input.incidents.length})`, 14, y);
   doc.setFont('helvetica', 'normal');
   if (input.incidents.length) {
     autoTable(doc, {
-      startY: afterTable + 13,
+      startY: y + 3,
       head: [['Date', 'Guard', 'Checkpoint', 'Description', 'Severity', 'Status']],
       body: input.incidents.map((i) => [formatDateTime(i.created_at), i.profiles?.full_name ?? '', i.checkpoints?.name ?? '', i.description, i.severity, i.status.replace('_', ' ')]),
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 1.8 },
       headStyles: { fillColor: PRIMARY, textColor: 255 },
       columnStyles: { 3: { cellWidth: 110 } },
-      margin: { left: 14, right: 14 },
+      margin: { left: 14, right: 14, bottom: 24 },
     });
   } else {
     doc.setFontSize(9);
     doc.setTextColor(...MUTED);
-    doc.text('None.', 14, afterTable + 16);
+    doc.text('None.', 14, y + 6);
   }
 
   // ---- Definitions + footer on every page

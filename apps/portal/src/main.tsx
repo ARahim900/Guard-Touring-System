@@ -35,8 +35,16 @@ if (env.sentryDsn) {
 
 /** Only signed-in supervisors/admins see the portal pages. */
 function RequireStaff() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, loadError, retry } = useAuth();
   if (loading) return <Spinner label="Checking sign-in…" />;
+  if (loadError) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-danger-text">{loadError}</p>
+        <button className="rounded-sm bg-primary px-4 py-2 text-white" onClick={retry}>Try again</button>
+      </div>
+    );
+  }
   if (!session || !profile) return <Navigate to="/login" replace />;
   return (
     <AlarmProvider>

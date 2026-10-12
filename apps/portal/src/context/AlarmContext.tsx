@@ -22,9 +22,13 @@ interface AlarmValue {
 const AlarmContext = createContext<AlarmValue | null>(null);
 
 /** Short two-tone beep using the browser's audio engine (no sound file needed). */
+let audio: AudioContext | null = null; // one shared audio engine for the whole tab
+
 function beep(urgent: boolean) {
   try {
-    const ctx = new AudioContext();
+    audio ??= new AudioContext();
+    void audio.resume();
+    const ctx = audio;
     const tones = urgent ? [880, 660, 880, 660] : [660];
     tones.forEach((f, i) => {
       const osc = ctx.createOscillator();
@@ -42,6 +46,9 @@ function beep(urgent: boolean) {
 
 export function AlarmProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
+  // Depend on the user id, not the session object: the session object changes on
+  // every hourly token refresh, which would needlessly reconnect the alarm feed.
+  const userId = session?.user.id;
   const [openCount, setOpenCount] = useState(0);
   const [sosOpen, setSosOpen] = useState(0);
   const [version, setVersion] = useState(0);
@@ -56,7 +63,7 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!userId) return;
     void refreshCounts();
     const channel = supabase
       .channel('alarms-feed')
@@ -83,7 +90,7 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [session, refreshCounts]);
+  }, [userId, refreshCounts]);
 
   const value = useMemo(() => ({ openCount, sosOpen, version, refreshCounts }), [openCount, sosOpen, version, refreshCounts]);
   return <AlarmContext.Provider value={value}>{children}</AlarmContext.Provider>;

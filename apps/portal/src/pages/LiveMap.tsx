@@ -8,10 +8,9 @@ import { useLiveData } from '@/lib/useLiveData';
 
 export default function LiveMapPage() {
   const { positions, alarms, checkpoints, updatedAt, reload } = useLiveData();
-  const points: [number, number][] = [
-    ...checkpoints.map((c) => [c.latitude, c.longitude] as [number, number]),
-    ...positions.map((p) => [p.latitude, p.longitude] as [number, number]),
-  ];
+  // Fit to the checkpoints only: guard positions change every few seconds and
+  // would keep re-zooming the map while a supervisor is looking at an SOS.
+  const points: [number, number][] = checkpoints.map((c) => [c.latitude, c.longitude]);
 
   return (
     <>

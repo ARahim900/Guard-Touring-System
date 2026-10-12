@@ -74,15 +74,15 @@ export default function ShiftsPage() {
     // Warn about overlaps with existing shifts of the same guard.
     const { data: clash } = await supabase
       .from('shifts')
-      .select('id, scheduled_start')
+      .select('id, scheduled_start, scheduled_end')
       .eq('guard_id', form.guard_id)
       .neq('status', 'cancelled')
       .lt('scheduled_start', rows[rows.length - 1].scheduled_end)
       .gt('scheduled_end', rows[0].scheduled_start);
-    const overlaps = (clash ?? []).filter((c) => rows.some((r) => {
-      const s = new Date(c.scheduled_start).getTime();
-      return s >= new Date(r.scheduled_start).getTime() - 86400000 && s < new Date(r.scheduled_end).getTime();
-    }));
+    // Two shifts overlap when each starts before the other ends.
+    const overlaps = (clash ?? []).filter((c) =>
+      rows.some((r) => new Date(c.scheduled_start) < new Date(r.scheduled_end) && new Date(c.scheduled_end) > new Date(r.scheduled_start)),
+    );
     if (overlaps.length && !window.confirm(`This guard already has ${overlaps.length} shift(s) around these times. Create anyway?`)) return;
 
     setSaving(true);
