@@ -612,3 +612,16 @@ grant execute on function public.start_shift(uuid), public.end_shift(uuid),
   public.patrol_stats(uuid, timestamptz, timestamptz), public.distance_m(double precision, double precision,
   double precision, double precision) to authenticated;
 grant select on public.shift_checkpoint_status to authenticated;
+-- Supabase grants new views to "anon" automatically; logged-out users get nothing.
+revoke all on public.shift_checkpoint_status from anon;
+
+-- Trigger functions run automatically inside the database; nobody needs to call
+-- them through the API (Supabase security advisor, lint 0028/0029).
+revoke all on function
+  public.handle_new_user(),
+  public.protect_profile_columns(),
+  public.prepare_scan_attachment(),
+  public.on_shift_written(),
+  public.on_route_checkpoints_changed(),
+  public.on_checkpoint_active_changed()
+from public, anon, authenticated;

@@ -37,6 +37,15 @@ Install **Visual Studio Code** (https://code.visualstudio.com). Open the `Patrol
 
 ## Part 2: Backend (Supabase)
 
+> **Status on 12 Oct 2026:** steps 2.2 and 2.3 are already done on project `zdezuylsruzbddqcdhog`, installed through the Claude connector and checked against the tested local copy.
+> - **Database:** all 13 tables, the security rules, the private storage bucket, realtime, the reports and the live-map view are installed.
+> - **Edge Function:** `admin-users` is deployed.
+>
+> **Still to do:**
+> - Step 2.1: turn off public sign-up.
+> - Run `supabase/finish_in_sql_editor.sql` once in the SQL Editor. It adds the 5-minute monitor.
+> - Steps 2.4 (first admin) and 2.6 (rotate the key).
+
 Your project reference is **`zdezuylsruzbddqcdhog`**. Its URL is `https://zdezuylsruzbddqcdhog.supabase.co`.
 
 ### 2.1 Turn off public sign-up

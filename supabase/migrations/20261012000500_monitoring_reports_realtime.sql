@@ -181,6 +181,7 @@ join public.routes r   on r.id = s.route_id
 where lp.recorded_at > now() - interval '12 hours'
 order by lp.guard_id, lp.recorded_at desc;
 grant select on public.live_guard_positions to authenticated;
+revoke all on public.live_guard_positions from anon;
 
 -- ---------------------------------------------------------------------------
 -- Realtime: the portal subscribes to these tables to update the live map and
