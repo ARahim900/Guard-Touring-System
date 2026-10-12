@@ -23,6 +23,7 @@ const SECTIONS = [
     label: 'Patrols', icon: CalendarClock,
     pages: [
       { to: '/shifts', label: 'Schedules & shift hours' },
+      { to: '/guard', label: 'Guard scanning' },
       { to: '/scans', label: 'Scan records' },
     ],
   },

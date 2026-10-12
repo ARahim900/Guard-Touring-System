@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
+import { InstallPatrol } from '@/components/InstallPatrol';
 import { Button, ErrorNote, Field, Input } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 
@@ -14,7 +15,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (session && profile) return <Navigate to="/" replace />;
+  if (session && profile) return <Navigate to={profile.role === 'guard' ? '/guard' : '/'} replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -33,7 +34,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center gap-2 text-center">
           <img src="/muscat-bay-logo.png" alt="Muscat Bay" className="h-24 w-auto" />
           <h1 className="text-xl">MB Patrol</h1>
-          <p className="text-sm text-muted-foreground">Supervisor portal · Muscat Bay</p>
+          <p className="text-sm text-muted-foreground">Guard scanning & supervisor portal</p>
         </div>
         <Field label="Email">
           <Input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -45,6 +46,7 @@ export default function LoginPage() {
         <Button type="submit" loading={busy} className="w-full">
           Sign in
         </Button>
+        <InstallPatrol />
         <p className="text-center text-xs text-muted-foreground">
           Forgotten password? Ask an admin to reset it. · <Link to="/privacy" className="underline">Privacy</Link>
         </p>

@@ -33,8 +33,8 @@ if (env.sentryDsn) {
   });
 }
 
-/** Only signed-in supervisors/admins see the portal pages. */
-function RequireStaff() {
+/** Active accounts share sign-in; staff pages have an additional role check. */
+function RequireAccount() {
   const { session, profile, loading, loadError, retry } = useAuth();
   if (loading) return <Spinner label="Checking sign-in…" />;
   if (loadError) {
@@ -46,19 +46,23 @@ function RequireStaff() {
     );
   }
   if (!session || !profile) return <Navigate to="/login" replace />;
-  return (
-    <AlarmProvider>
-      <Outlet />
-    </AlarmProvider>
-  );
+  return <Outlet />;
+}
+
+function RequireStaff() {
+  const { profile } = useAuth();
+  if (profile?.role === 'guard') return <Navigate to="/guard" replace />;
+  return <AlarmProvider><Outlet /></AlarmProvider>;
 }
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/privacy', element: <PrivacyPage /> }, // public: linked from the app stores
   {
-    element: <RequireStaff />,
+    element: <RequireAccount />,
     children: [
+      { path: 'guard', lazy: page(() => import('@/pages/GuardPatrol')) },
+      { element: <RequireStaff />, children: [
       {
         element: <Layout />,
         children: [
@@ -76,6 +80,7 @@ const router = createBrowserRouter([
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },
+      ] },
     ],
   },
 ]);

@@ -1,7 +1,7 @@
 // =============================================================================
-// Login state for the portal. Only active supervisors and admins get in;
-// guards are signed straight back out with a clear message.
+// Shared sign-in. Route guards separate patrol scanning from staff management.
 // =============================================================================
+import { toast } from 'sonner';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -24,7 +24,7 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue | null>(null);
 
 async function loadProfile(userId: string) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('id, full_name, email, employee_no, phone, role, contractor_id, active').eq('id', userId).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
   if (error) throw error; // network/server problem: NOT a reason to sign anyone out
   return (data as Profile | null) ?? null;
 }
@@ -33,7 +33,7 @@ async function loadProfile(userId: string) {
 // sign the same person out of the guard app on their phone, mid-patrol.
 const signOutHere = () => supabase.auth.signOut({ scope: 'local' });
 
-const isStaff = (p: Profile | null) => Boolean(p && p.active && (p.role === 'supervisor' || p.role === 'admin'));
+const isActive = (p: Profile | null) => Boolean(p?.active && ['guard', 'supervisor', 'admin'].includes(p.role));
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -44,11 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const boot = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const { data } = await supabase.auth.getSession();
     try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
       const p = data.session ? await loadProfile(data.session.user.id) : null;
-      if (data.session && !isStaff(p)) {
-        await signOutHere();
+      if (data.session && !isActive(p)) {
+        const { error } = await signOutHere();
+        if (error) throw error;
       } else {
         setSession(data.session);
         setProfile(p);
@@ -81,9 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       return friendlyError(e);
     }
-    if (!isStaff(p)) {
-      await signOutHere();
-      return 'This portal is for supervisors and admins only.';
+    if (!isActive(p)) {
+      const { error: signOutError } = await signOutHere();
+      if (signOutError) return friendlyError(signOutError);
+      return 'Your account is not active. Contact your supervisor.';
     }
     setSession(data.session);
     setProfile(p);
@@ -91,7 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await signOutHere();
+    const { error } = await signOutHere();
+    if (error) toast.error(friendlyError(error));
   }, []);
 
   const value = useMemo(

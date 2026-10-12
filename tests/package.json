@@ -2,6 +2,11 @@
   "name": "patrol-verification",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test *.test.mjs" },
-  "devDependencies": { "@electric-sql/pglite": "^0.3.14" }
+  "scripts": {
+    "test": "node --test *.test.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "fake-indexeddb": "^6.2.5"
+  }
 }
