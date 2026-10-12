@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
   try {
     // 1. Who is calling? Verify their login token with Supabase Auth.
     const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
+    if (!token) return json({ error: 'Please sign in again.' }, 401);
     const { data: userData, error: userError } = await admin.auth.getUser(token);
     if (userError || !userData.user) return json({ error: 'Please sign in again.' }, 401);
 

@@ -41,9 +41,9 @@ Install **Visual Studio Code** (https://code.visualstudio.com). Open the `Patrol
 > - **Database:** all 13 tables, the security rules, the private storage bucket, realtime, the reports and the live-map view are installed. Migrations 06 (guard on duty, for the shared login) and 07 (daily patrol log) are installed too.
 > - **Edge Function:** `admin-users` is deployed.
 >
-> **Still to do:**
-> - Step 2.1: turn off public sign-up.
-> - Steps 2.4 (first admin) and 2.6 (rotate the key).
+> **Also done:** step 2.1 (public sign-up is off) and step 2.6 (leaked key revoked).
+>
+> **Still to do:** step 2.4 (first admin).
 
 Your project reference is **`zdezuylsruzbddqcdhog`**. Its URL is `https://zdezuylsruzbddqcdhog.supabase.co`.
 
@@ -80,13 +80,15 @@ Check it worked:
 - **Integrations → Cron** (or Database → Cron): a job called **patrol-monitor** that runs every 5 minutes.
 
 ### 2.3 Deploy the Edge Function (account management)
-Why: creating a login needs the `service_role` key. That key must stay on Supabase's servers, so the portal asks this function to create accounts instead.
+Why: creating a login needs the secret key (`sb_secret_…`, formerly `service_role`). That key must stay on Supabase's servers, so the portal asks this function to create accounts instead.
 ```bash
 npx supabase functions deploy admin-users --project-ref zdezuylsruzbddqcdhog --no-verify-jwt
 ```
-You do not need to set any secret. Supabase gives every function its own `SUPABASE_URL` and `SUPABASE_SECRET_KEYS` (the new `sb_secret_...` key) automatically.
+You do not need to set any secret. Supabase gives every function its own `SUPABASE_URL` and `SUPABASE_SECRET_KEYS` automatically.
 
-Why `--no-verify-jwt`: Supabase's built-in "Verify JWT" check only understands the legacy keys, which are switched off (step 2.6). The function checks the caller's login itself, so it stays protected. **Always deploy with this flag**, or account creation will fail.
+Before deploying, check **Project Settings → API Keys → Publishable and secret API keys** shows a publishable key and a secret key named `default`. Older projects must press **Create new API keys** first; without them `SUPABASE_SECRET_KEYS` does not exist and the function fails at start-up.
+
+`--no-verify-jwt` is required: the platform's built-in JWT check only understands the legacy keys, which are switched off (step 2.6). The function checks the caller's login itself, so it stays protected. **Always deploy with this flag**, or account creation will fail.
 
 ### 2.4 Make yourself the first admin
 1. Dashboard → **Authentication** → **Users** → **Add user** → **Create new user**. Enter your email and a strong password, and tick **Auto Confirm User**.
@@ -95,11 +97,23 @@ Why `--no-verify-jwt`: Supabase's built-in "Verify JWT" check only understands t
 ### 2.5 Check the security advisors
 Dashboard → **Advisors** → **Security Advisor**. It should show no "RLS disabled" errors.
 
-### 2.6 Switch off the leaked legacy keys
-The legacy `service_role` key was pasted into a chat while this system was being built. Treat it as compromised: anyone holding it can read and delete all data.
-1. The apps use the **new keys** instead: the publishable key (`sb_publishable_...`) in the portal, guard app, Netlify and EAS, and the secret key (`sb_secret_...`) inside the Edge Function only.
-2. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This switches off both legacy keys (`anon` and `service_role`). You can switch them back on from the same page if something breaks.
-3. Check straight away: sign in to the portal, open the Dashboard, and create a test guard account (step 3.3). If all three work, you are done.
+### 2.6 Rotate the leaked `service_role` key
+The `service_role` key was pasted into a chat while this system was being built. Treat it as compromised: anyone holding it can read and delete all data.
+The fix is to move to Supabase's new key pair and switch the legacy keys off:
+
+| Legacy key (off) | Replaced by | Used by |
+|---|---|---|
+| `anon` | Publishable key `sb_publishable_…` | Portal and guard app (`VITE_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) |
+| `service_role` | Secret key `sb_secret_…` | `admin-users` Edge Function only (read from `SUPABASE_SECRET_KEYS`) |
+
+1. Put the **publishable** key in both `.env` files and the Netlify and EAS variables. The variable names stay the same.
+2. Redeploy the portal and ship a new guard app build. The keys are compiled into the apps, so changing a variable does not update a copy already deployed or installed. Check **API Keys → Legacy** shows the legacy keys are no longer being used.
+3. Deploy the Edge Function as in step 2.3.
+4. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This stops the legacy keys working in the `apikey` header.
+5. Dashboard → **Project Settings** → **JWT Keys** → **Previously used keys** → **Legacy HS256 (Shared Secret)** → **Revoke key**. Step 4 alone is not enough: the legacy keys stay valid as login tokens (`Authorization: Bearer`) until the secret that signed them is revoked.
+6. Create a test account from the portal (step 3.3). This confirms the Edge Function still works.
+
+> **Status on 12 Oct 2026:** steps 3–5 are done on `zdezuylsruzbddqcdhog` (no client had been deployed yet, so step 2 did not apply). Tested: the legacy keys are rejected in both the `apikey` and `Authorization` headers; the publishable key and the Edge Function work.
 
 ---
 
@@ -111,7 +125,7 @@ cd apps/portal
 npm ci                         # installs the exact package versions in package-lock.json
 cp .env.example .env.local     # Windows PowerShell: Copy-Item .env.example .env.local
 ```
-Open `.env.local` and paste the **publishable** key (`sb_publishable_...`) after `VITE_SUPABASE_ANON_KEY=`. Find it under Dashboard → Project Settings → API Keys. **Never paste a secret key here.**
+Open `.env.local` and paste the **publishable** key (`sb_publishable_…`) after `VITE_SUPABASE_ANON_KEY=`. Find it under Dashboard → Project Settings → API Keys. **Never paste a secret key here.**
 ```bash
 npm run dev                    # open http://localhost:5173 and sign in as the admin
 ```
@@ -149,7 +163,7 @@ NFC, background location and Sentry use native code that the general-purpose **E
 ```bash
 cd apps/guard
 npm ci
-cp .env.example .env            # then paste the anon key and the control-room number
+cp .env.example .env            # then paste the publishable key and the control-room number
 npm install -g eas-cli
 eas login
 eas init                        # creates the Expo project and prints its ID
@@ -160,7 +174,7 @@ eas init                        # creates the Expo project and prints its ID
 `.env` stays on your computer, so EAS needs its own copy of the public values. Run this once per environment (`development`, `preview`, `production`):
 ```bash
 eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_URL --value https://zdezuylsruzbddqcdhog.supabase.co --visibility plaintext
-eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <publishable key sb_publishable_...> --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <publishable key> --visibility plaintext
 eas env:create --environment development --name EXPO_PUBLIC_CONTROL_ROOM_PHONE --value +96824857781 --visibility plaintext
 # Optional crash reporting:
 eas env:create --environment development --name EXPO_PUBLIC_SENTRY_DSN --value <dsn> --visibility plaintext
