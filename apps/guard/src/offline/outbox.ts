@@ -1,8 +1,12 @@
 // =============================================================================
 // Outbox: functions that put work INTO the local queue and read it back.
 // The sync engine (sync.ts) takes work OUT and uploads it.
+// Every item records which guard saved it (guard_id), and is only ever read
+// back or uploaded for that same guard.
 // =============================================================================
 import { Directory, File, Paths } from 'expo-file-system';
+
+import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { AttachmentSource, AttachmentType, ScanMethod, ScanStatus, ScanValidation } from '@/lib/types';
 import { getDb } from './db';
@@ -68,6 +72,18 @@ export interface PendingAttachmentRow {
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'audio/mp4': 'm4a' };
 
 /**
+ * Run SQLite transactions one after another. The app and the background
+ * location task share one database connection, and SQLite cannot start a
+ * transaction while another is open on the same connection.
+ */
+let txChain: Promise<unknown> = Promise.resolve();
+function serialTx(db: SQLiteDatabase, task: () => Promise<void>): Promise<void> {
+  const run = txChain.then(() => db.withTransactionAsync(task));
+  txChain = run.catch(() => undefined);
+  return run;
+}
+
+/**
  * Copy temporary camera/recorder files into the app's permanent document
  * folder. The OS may delete "cache" files at any time, which would lose
  * evidence that has not been uploaded yet.
@@ -82,15 +98,15 @@ function persistFile(scanId: string, att: DraftAttachment): { uri: string; size:
 }
 
 /** Save a scan and its attachments to the outbox in one transaction. */
-export async function enqueueScan(payload: ScanPayload, checkpointName: string, attachments: DraftAttachment[]) {
+export async function enqueueScan(guardId: string, payload: ScanPayload, checkpointName: string, attachments: DraftAttachment[]) {
   const db = await getDb();
   const files = attachments.map((a) => ({ att: a, ...persistFile(payload.p_scan_id, a) }));
   const now = new Date().toISOString();
 
-  await db.withTransactionAsync(async () => {
+  await serialTx(db, async () => {
     await db.runAsync(
-      `INSERT INTO outbox_scans (id, payload, checkpoint_name, device_time, created_at) VALUES (?, ?, ?, ?, ?)`,
-      payload.p_scan_id, JSON.stringify(payload), checkpointName, payload.p_device_time, now,
+      `INSERT INTO outbox_scans (id, guard_id, payload, checkpoint_name, device_time, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      payload.p_scan_id, guardId, JSON.stringify(payload), checkpointName, payload.p_device_time, now,
     );
     for (const f of files) {
       await db.runAsync(
@@ -124,23 +140,24 @@ const toLocalScan = (r: ScanDbRow): LocalScan => ({
 });
 
 /** Local scans (any status) whose scan time falls in [from, to). */
-export async function listLocalScans(fromIso: string, toIso: string): Promise<LocalScan[]> {
+export async function listLocalScans(guardId: string, fromIso: string, toIso: string): Promise<LocalScan[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<ScanDbRow>(
     `SELECT s.*, (SELECT COUNT(*) FROM outbox_attachments a WHERE a.scan_id = s.id AND a.status = 'pending') AS pending_attachments
        FROM outbox_scans s
-      WHERE s.device_time >= ? AND s.device_time < ?
+      WHERE s.guard_id = ? AND s.device_time >= ? AND s.device_time < ?
       ORDER BY s.device_time DESC`,
-    fromIso, toIso,
+    guardId, fromIso, toIso,
   );
   return rows.map(toLocalScan);
 }
 
 /** Scans waiting for upload, oldest first (so the server sees them in order). */
-export async function pendingScans(): Promise<LocalScan[]> {
+export async function pendingScans(guardId: string): Promise<LocalScan[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<ScanDbRow>(
-    `SELECT s.*, 0 AS pending_attachments FROM outbox_scans s WHERE status = 'pending' ORDER BY device_time ASC`,
+    `SELECT s.*, 0 AS pending_attachments FROM outbox_scans s WHERE status = 'pending' AND guard_id = ? ORDER BY device_time ASC`,
+    guardId,
   );
   return rows.map(toLocalScan);
 }
@@ -188,13 +205,14 @@ export async function retryScan(id: string) {
 }
 
 /** Attachments whose scan is already on the server. */
-export async function uploadableAttachments(): Promise<PendingAttachmentRow[]> {
+export async function uploadableAttachments(guardId: string): Promise<PendingAttachmentRow[]> {
   const db = await getDb();
   return db.getAllAsync<PendingAttachmentRow>(
     `SELECT a.* FROM outbox_attachments a
        JOIN outbox_scans s ON s.id = a.scan_id
-      WHERE a.status = 'pending' AND s.status = 'synced'
+      WHERE a.status = 'pending' AND s.status = 'synced' AND s.guard_id = ?
       ORDER BY a.captured_at ASC`,
+    guardId,
   );
 }
 
@@ -228,20 +246,23 @@ export interface PendingCounts {
   failed: number;
 }
 
-export async function pendingCounts(): Promise<PendingCounts> {
+export async function pendingCounts(guardId: string): Promise<PendingCounts> {
   const db = await getDb();
-  const r = await db.getFirstAsync<PendingCounts>(`
-    SELECT
-      (SELECT COUNT(*) FROM outbox_scans WHERE status = 'pending')       AS scans,
-      (SELECT COUNT(*) FROM outbox_attachments WHERE status = 'pending') AS attachments,
-      (SELECT COUNT(*) FROM outbox_pings)                                AS pings,
-      (SELECT COUNT(*) FROM outbox_scans WHERE status = 'failed')        AS failed
-  `);
+  const r = await db.getFirstAsync<PendingCounts>(
+    `SELECT
+      (SELECT COUNT(*) FROM outbox_scans WHERE status = 'pending' AND guard_id = ?1) AS scans,
+      (SELECT COUNT(*) FROM outbox_attachments a JOIN outbox_scans s ON s.id = a.scan_id
+        WHERE a.status = 'pending' AND s.guard_id = ?1)                              AS attachments,
+      (SELECT COUNT(*) FROM outbox_pings WHERE guard_id = ?1)                        AS pings,
+      (SELECT COUNT(*) FROM outbox_scans WHERE status = 'failed' AND guard_id = ?1)  AS failed`,
+    guardId,
+  );
   return r ?? { scans: 0, attachments: 0, pings: 0, failed: 0 };
 }
 
 // ----------------------------------------------------------------- GPS trail
 export interface PingInput {
+  guard_id: string;
   shift_id: string;
   latitude: number;
   longitude: number;
@@ -254,20 +275,20 @@ export interface PingInput {
 export async function addPings(pings: PingInput[]) {
   if (!pings.length) return;
   const db = await getDb();
-  await db.withTransactionAsync(async () => {
+  await serialTx(db, async () => {
     for (const p of pings) {
       await db.runAsync(
-        `INSERT INTO outbox_pings (shift_id, latitude, longitude, accuracy_m, speed_mps, is_mocked, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        p.shift_id, p.latitude, p.longitude, p.accuracy_m, p.speed_mps, p.is_mocked ? 1 : 0, p.recorded_at,
+        `INSERT INTO outbox_pings (guard_id, shift_id, latitude, longitude, accuracy_m, speed_mps, is_mocked, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        p.guard_id, p.shift_id, p.latitude, p.longitude, p.accuracy_m, p.speed_mps, p.is_mocked ? 1 : 0, p.recorded_at,
       );
     }
   });
 }
 
-export async function takePings(limit = 200) {
+export async function takePings(guardId: string, limit = 200) {
   const db = await getDb();
   return db.getAllAsync<PingInput & { id: number; is_mocked: number | boolean }>(
-    `SELECT * FROM outbox_pings ORDER BY recorded_at ASC LIMIT ?`, limit,
+    `SELECT * FROM outbox_pings WHERE guard_id = ? ORDER BY recorded_at ASC LIMIT ?`, guardId, limit,
   );
 }
 
@@ -286,14 +307,19 @@ export interface SosPayload {
   p_message: string | null;
 }
 
-export async function enqueueSos(id: string, payload: SosPayload) {
+export async function enqueueSos(guardId: string, id: string, payload: SosPayload) {
   const db = await getDb();
-  await db.runAsync(`INSERT OR IGNORE INTO outbox_sos (id, payload, created_at) VALUES (?, ?, ?)`, id, JSON.stringify(payload), new Date().toISOString());
+  await db.runAsync(
+    `INSERT OR IGNORE INTO outbox_sos (id, guard_id, payload, created_at) VALUES (?, ?, ?, ?)`,
+    id, guardId, JSON.stringify(payload), new Date().toISOString(),
+  );
 }
 
-export async function pendingSos() {
+export async function pendingSos(guardId: string) {
   const db = await getDb();
-  const rows = await db.getAllAsync<{ id: string; payload: string; created_at: string }>(`SELECT * FROM outbox_sos ORDER BY created_at`);
+  const rows = await db.getAllAsync<{ id: string; payload: string; created_at: string }>(
+    `SELECT * FROM outbox_sos WHERE guard_id = ? ORDER BY created_at`, guardId,
+  );
   return rows.map((r) => ({ id: r.id, created_at: r.created_at, payload: JSON.parse(r.payload) as SosPayload }));
 }
 

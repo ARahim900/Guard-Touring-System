@@ -15,6 +15,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } fr
 
 import { VoiceRecorder } from '@/components/VoiceRecorder';
 import { AppText, Badge, Button, Card, Screen, Segmented, TextField } from '@/components/ui';
+import { useAuth } from '@/context/AuthProvider';
 import { useShift } from '@/context/ShiftProvider';
 import { useToast } from '@/context/ToastProvider';
 import { friendlyError } from '@/lib/errors';
@@ -32,9 +33,12 @@ import { clearScanDraft, getScanDraft } from '@/services/scanDraft';
 const MAX_PHOTOS = 6;
 
 export default function ReportScreen() {
-  const draft = getScanDraft();
+  // Read the draft once: save() clears it, and re-reading it on the next render
+  // would make this screen navigate back a second time.
+  const [draft] = useState(getScanDraft);
   const toast = useToast();
   const { reloadLocal } = useShift();
+  const { session } = useAuth();
   const [status, setStatus] = useState<ScanStatus>('normal');
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState<DraftAttachment[]>([]);
@@ -90,6 +94,7 @@ export default function ReportScreen() {
     const attachments = memo ? [...photos, memo] : photos;
     try {
       await enqueueScan(
+        session!.user.id,
         {
           p_scan_id: draft!.scanId,
           p_shift_id: draft!.shiftId,

@@ -59,6 +59,7 @@ export default function HistoriesScreen() {
 // --------------------------------------------------------------- Records
 function Records() {
   const toast = useToast();
+  const { session } = useAuth();
   const [day, setDay] = useState(muscatDayKey());
   const [items, setItems] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +69,7 @@ function Records() {
 
   const load = useCallback(async () => {
     const { from, to } = muscatDayRange(day);
-    const local = await listLocalScans(from, to);
+    const local = session ? await listLocalScans(session.user.id, from, to) : [];
     const { data, error } = await supabase
       .from('scans')
       .select('id, shift_id, checkpoint_id, method, status, note, effective_time, distance_m, accuracy_m, validation, flags, is_on_time, expected_attachments, checkpoints(name), scan_attachments(count)')
@@ -118,7 +119,7 @@ function Records() {
     }
     setItems([...byId.values()].sort((a, b) => b.time.localeCompare(a.time)));
     setLoading(false);
-  }, [day]);
+  }, [day, session]);
 
   useFocusEffect(
     useCallback(() => {

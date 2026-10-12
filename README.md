@@ -71,4 +71,5 @@ Patrolling_Tour_System/
   - Gallery photo dating, storage folder rules, statistics, the contractor report, the 5-minute monitor and route-change protection.
 - The guard app type-checks with zero errors. Its JavaScript bundle builds for Android and iOS.
 - The portal type-checks, builds for production, and its login and privacy pages render with no browser errors.
+- Three independent review agents then audited the database, the guard app and the portal. They confirmed 26 defects, all fixed and re-tested: 7 in the database, 10 in the guard app and 9 in the portal.
 - **Not yet tested:** running against your live Supabase project, and on real phones. This container could not reach the project. NFC, GPS and background tracking can only be proven on physical devices.

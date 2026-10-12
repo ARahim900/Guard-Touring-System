@@ -13,6 +13,7 @@ import { Siren } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useAuth } from '@/context/AuthProvider';
 import { useShift } from '@/context/ShiftProvider';
 import { useToast } from '@/context/ToastProvider';
 import { env } from '@/lib/env';
@@ -34,6 +35,7 @@ function offerCall(title: string, message: string) {
 
 export function SosButton() {
   const { shift } = useShift();
+  const { session } = useAuth();
   const toast = useToast();
   const [sending, setSending] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
@@ -51,13 +53,18 @@ export function SosButton() {
       p_message: null,
     };
     try {
-      const { error } = await supabase.rpc('trigger_sos', payload);
+      // Give up after 8 s on a weak signal, so the guard is offered the phone
+      // call straight away instead of watching a spinner.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const { error } = await supabase.rpc('trigger_sos', payload).abortSignal(controller.signal);
+      clearTimeout(timer);
       if (error) throw error;
       toast.success('SOS sent. Supervisors have been alerted.');
       offerCall('SOS sent', 'Supervisors can see your position. Stay safe and call if you can.');
     } catch (e) {
       reportError(e, { where: 'sos' });
-      await enqueueSos(Crypto.randomUUID(), payload);
+      if (session) await enqueueSos(session.user.id, Crypto.randomUUID(), payload);
       offerCall('No connection', 'Your SOS is saved and will be sent the moment you have signal. Call the control room now.');
     } finally {
       setSending(false);

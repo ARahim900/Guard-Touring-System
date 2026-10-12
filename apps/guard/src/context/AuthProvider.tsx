@@ -4,12 +4,13 @@
 // Accounts are created by supervisors (no "Sign up" in this app). This app is
 // for guards only: supervisor/admin accounts are sent to the web portal.
 // =============================================================================
-import type { Session } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isAuthRetryableFetchError, type Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { friendlyError } from '@/lib/errors';
 import { Sentry } from '@/lib/sentry';
-import { supabase } from '@/lib/supabase';
+import { AUTH_STORAGE_KEY, supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 import { clearCache, readCache, writeCache } from '@/offline/cache';
 import { clearOutbox } from '@/offline/outbox';
@@ -61,15 +62,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // 1. Restore the saved session when the app starts.
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      await loadProfile(data.session);
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      let s = data.session;
+      // Offline with an expired token, Supabase cannot refresh it and reports "no
+      // session", although the saved session is still there. Keep the guard signed
+      // in so they can scan offline; the token is refreshed once signal returns.
+      if (!s && error && isAuthRetryableFetchError(error)) {
+        const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEY).catch(() => null);
+        s = raw ? (JSON.parse(raw) as Session) : null;
+      }
+      setSession(s);
+      await loadProfile(s); // falls back to the cached profile when offline
       setLoading(false);
     });
     // 2. Follow future changes (sign in, sign out, token refresh).
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      if (!s) setProfile(null);
+      if (!s) {
+        setProfile(null);
+        // Signed out by the server (e.g. account disabled): stop recording location.
+        if (event === 'SIGNED_OUT') void stopTracking().catch(() => undefined);
+      } else if (event === 'TOKEN_REFRESHED') {
+        // Back online after an offline start: refresh the profile too.
+        // (setTimeout: Supabase advises not to call it inside this callback.)
+        setTimeout(() => void loadProfile(s), 0);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);

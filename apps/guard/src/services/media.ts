@@ -9,6 +9,7 @@
 import * as Crypto from 'expo-crypto';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import type { DraftAttachment } from '@/offline/outbox';
 
@@ -63,8 +64,12 @@ export async function takePhoto(): Promise<DraftAttachment | null> {
  * The server repeats this check; the flag here only informs the guard.
  */
 export async function pickPhoto(shiftStartIso: string): Promise<DraftAttachment | null> {
-  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!perm.granted) throw new Error('Photo library access is off. Turn it on in Settings.');
+  // Android's system photo picker needs no permission (and asking would fail,
+  // because the old storage permissions are deliberately blocked). iOS asks.
+  if (Platform.OS === 'ios') {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) throw new Error('Photo library access is off. Turn it on in Settings.');
+  }
   const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, exif: true });
   if (res.canceled || !res.assets[0]) return null;
   const asset = res.assets[0];

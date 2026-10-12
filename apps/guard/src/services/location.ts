@@ -17,7 +17,12 @@ import * as Location from 'expo-location';
 import { colors } from '@/lib/theme';
 
 export const LOCATION_TASK = 'mbpatrol-background-location';
-export const TRACKING_SHIFT_KEY = 'mbpatrol.tracking.shiftId';
+/** Which shift (and whose login) the background task records points for. */
+export const TRACKING_KEY = 'mbpatrol.tracking';
+export interface TrackingTarget {
+  shiftId: string;
+  guardId: string;
+}
 
 export interface Fix {
   latitude: number;
@@ -69,12 +74,12 @@ export async function isTracking(): Promise<boolean> {
 }
 
 /** Start background tracking for a shift. Returns false if permission was refused. */
-export async function startTracking(shiftId: string): Promise<{ ok: boolean; background: boolean }> {
+export async function startTracking(shiftId: string, guardId: string): Promise<{ ok: boolean; background: boolean }> {
   if (!(await ensureForegroundPermission())) return { ok: false, background: false };
   // Background permission is a second, separate prompt ("Allow all the time").
   const bg = await Location.requestBackgroundPermissionsAsync().catch(() => ({ granted: false }));
 
-  await AsyncStorage.setItem(TRACKING_SHIFT_KEY, shiftId);
+  await AsyncStorage.setItem(TRACKING_KEY, JSON.stringify({ shiftId, guardId } satisfies TrackingTarget));
   if (await isTracking()) return { ok: true, background: bg.granted };
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK, {
@@ -96,7 +101,7 @@ export async function startTracking(shiftId: string): Promise<{ ok: boolean; bac
 }
 
 export async function stopTracking(): Promise<void> {
-  await AsyncStorage.removeItem(TRACKING_SHIFT_KEY);
+  await AsyncStorage.removeItem(TRACKING_KEY);
   if (await isTracking()) {
     await Location.stopLocationUpdatesAsync(LOCATION_TASK);
   }

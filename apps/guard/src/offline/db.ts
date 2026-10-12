@@ -24,6 +24,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE TABLE IF NOT EXISTS outbox_scans (
       id              TEXT PRIMARY KEY NOT NULL,
+      guard_id        TEXT NOT NULL,           -- whose login saved it (never upload under another login)
       payload         TEXT NOT NULL,           -- JSON arguments for submit_scan
       checkpoint_name TEXT NOT NULL,
       device_time     TEXT NOT NULL,
@@ -55,6 +56,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE TABLE IF NOT EXISTS outbox_pings (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      guard_id    TEXT NOT NULL,
       shift_id    TEXT NOT NULL,
       latitude    REAL NOT NULL,
       longitude   REAL NOT NULL,
@@ -66,6 +68,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE TABLE IF NOT EXISTS outbox_sos (
       id         TEXT PRIMARY KEY NOT NULL,
+      guard_id   TEXT NOT NULL,
       payload    TEXT NOT NULL,
       created_at TEXT NOT NULL
     );

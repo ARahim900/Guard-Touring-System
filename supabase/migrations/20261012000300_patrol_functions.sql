@@ -352,7 +352,8 @@ begin
 
   insert into public.alarms (type, guard_id, shift_id, message, latitude, longitude, accuracy_m)
   values ('sos', v_uid, p_shift_id,
-          coalesce(nullif(btrim(p_message), ''), 'SOS raised by ' || coalesce(v_name, 'guard')),
+          -- Always lead with the guard's name; the app may add a note (e.g. "raised offline at 21:45").
+          'SOS raised by ' || coalesce(v_name, 'guard') || coalesce(': ' || nullif(btrim(p_message), ''), ''),
           p_latitude, p_longitude, p_accuracy_m)
   returning * into v_row;
   return v_row;

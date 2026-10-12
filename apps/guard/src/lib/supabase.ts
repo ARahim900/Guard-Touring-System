@@ -16,8 +16,26 @@ import { AppState } from 'react-native';
 
 import { env } from './env';
 
+/** Where the login session is saved on the phone (read directly when offline). */
+export const AUTH_STORAGE_KEY = 'mbpatrol-auth';
+
+/**
+ * Android's network layer has no time limit of its own: on one bar of signal a
+ * request can hang for minutes and block everything queued behind it. Every
+ * request is therefore cancelled after 90 s (long enough for a photo on slow 3G).
+ * A caller can pass its own, shorter limit (the SOS button uses 8 s).
+ */
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  if (init?.signal) return fetch(input, init);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90_000);
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+};
+
 export const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
+  global: { fetch: fetchWithTimeout },
   auth: {
+    storageKey: AUTH_STORAGE_KEY,
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,

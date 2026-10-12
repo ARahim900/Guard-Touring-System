@@ -1,13 +1,11 @@
 // =============================================================================
 // Root layout: the first screen code that runs. It
-//   1. registers the background location task (must be first),
+//   1. (the background location task is registered earlier, in /index.ts),
 //   2. starts Sentry crash reporting,
 //   3. loads the DM Sans brand font,
 //   4. wraps the app in providers (toasts, login, shift),
 //   5. shows the login screen or the tabs, depending on who is signed in.
 // =============================================================================
-import '@/tasks/locationTask';
-
 // Import each weight separately so only these four font files are bundled.
 import { DMSans_400Regular } from '@expo-google-fonts/dm-sans/400Regular';
 import { DMSans_500Medium } from '@expo-google-fonts/dm-sans/500Medium';

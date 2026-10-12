@@ -22,6 +22,7 @@ import { AppState } from 'react-native';
 import { friendlyError, isNetworkError, isServerRejection } from '@/lib/errors';
 import { reportError } from '@/lib/sentry';
 import { MEDIA_BUCKET, supabase } from '@/lib/supabase';
+import { formatDateTime } from '@/lib/time';
 import type { ScanRow } from '@/lib/types';
 import {
   bumpAttachmentAttempt,
@@ -73,9 +74,16 @@ export function subscribeSync(listener: (s: SyncState) => void) {
   };
 }
 
+/** The signed-in guard's id, or null. The outbox is only ever read for this guard. */
+async function currentGuardId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+
 export async function refreshPendingCounts() {
   try {
-    setState({ pending: await pendingCounts() });
+    const guardId = await currentGuardId();
+    setState({ pending: guardId ? await pendingCounts(guardId) : { scans: 0, attachments: 0, pings: 0, failed: 0 } });
   } catch (e) {
     reportError(e, { where: 'refreshPendingCounts' });
   }
@@ -84,11 +92,13 @@ export async function refreshPendingCounts() {
 /** Thrown inside a sync step to stop the whole run when the network drops. */
 class OfflineError extends Error {}
 
-async function syncSos() {
-  for (const item of await pendingSos()) {
+async function syncSos(guardId: string) {
+  for (const item of await pendingSos(guardId)) {
+    // The alarm's own time is when it reached the server, so record when the
+    // guard actually pressed SOS (in Muscat time). The server adds the name.
     const { error } = await supabase.rpc('trigger_sos', {
       ...item.payload,
-      p_message: `${item.payload.p_message ?? 'SOS'} (sent late: raised ${item.created_at})`,
+      p_message: `Raised offline at ${formatDateTime(item.created_at)} (Muscat time), delivered late`,
     });
     if (error) {
       if (isNetworkError(error) || !isServerRejection(error)) throw new OfflineError(error.message);
@@ -98,8 +108,8 @@ async function syncSos() {
   }
 }
 
-async function syncScans() {
-  for (const scan of await pendingScans()) {
+async function syncScans(guardId: string) {
+  for (const scan of await pendingScans(guardId)) {
     // device_sent_at is read NOW, at the moment of sending. The server compares
     // it with its own clock to measure how wrong the phone's clock is.
     const { data, error } = await supabase.rpc('submit_scan', {
@@ -120,7 +130,7 @@ async function syncScans() {
 }
 
 async function syncAttachments(guardId: string) {
-  for (const att of await uploadableAttachments()) {
+  for (const att of await uploadableAttachments(guardId)) {
     const ext = att.mime_type === 'image/jpeg' ? 'jpg' : 'm4a';
     const path = `scans/${att.scan_id}/${att.id}.${ext}`;
     const file = new File(att.local_uri);
@@ -180,54 +190,67 @@ async function syncAttachments(guardId: string) {
   }
 }
 
+type QueuedPing = Awaited<ReturnType<typeof takePings>>[number];
+
+const toPingRow = (guardId: string, p: QueuedPing) => ({
+  guard_id: guardId,
+  shift_id: p.shift_id,
+  latitude: p.latitude,
+  longitude: p.longitude,
+  accuracy_m: p.accuracy_m,
+  speed_mps: p.speed_mps,
+  is_mocked: Boolean(p.is_mocked),
+  recorded_at: p.recorded_at,
+});
+
 async function syncPings(guardId: string) {
   // Send in batches of 200 until the queue is empty.
   for (let i = 0; i < 20; i++) {
-    const batch = await takePings(200);
+    const batch = await takePings(guardId, 200);
     if (!batch.length) return;
-    const { error } = await supabase.from('location_pings').insert(
-      batch.map((p) => ({
-        guard_id: guardId,
-        shift_id: p.shift_id,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        accuracy_m: p.accuracy_m,
-        speed_mps: p.speed_mps,
-        is_mocked: Boolean(p.is_mocked),
-        recorded_at: p.recorded_at,
-      })),
-    );
-    if (error) {
-      if (isServerRejection(error)) {
-        // e.g. the shift was deleted: these points can never be stored.
-        reportError(error, { where: 'syncPings' });
-        await deletePings(batch.map((p) => p.id));
-        continue;
-      }
-      throw new OfflineError(error.message);
+    const { error } = await supabase.from('location_pings').insert(batch.map((p) => toPingRow(guardId, p)));
+    if (!error) {
+      await deletePings(batch.map((p) => p.id));
+      continue;
     }
-    await deletePings(batch.map((p) => p.id));
+    if (!isServerRejection(error)) throw new OfflineError(error.message);
+
+    // The server refused the batch because of one or more bad points (e.g. a
+    // timestamp from before the phone's clock was corrected). Send them one by
+    // one, so only the points the server refuses on their own are dropped.
+    reportError(error, { where: 'syncPings' });
+    for (const p of batch) {
+      const r = await supabase.from('location_pings').insert(toPingRow(guardId, p));
+      if (r.error && !isServerRejection(r.error)) throw new OfflineError(r.error.message);
+      await deletePings([p.id]);
+    }
   }
 }
 
 let running: Promise<void> | null = null;
+let runningPingsOnly = false;
 
 /**
  * Upload everything in the outbox. Safe to call many times: if a run is
  * already in progress, callers wait for that run instead of starting another.
+ * A full sync requested during a GPS-only run (from the background task) waits
+ * for it to finish and then runs in full, so a new scan is never left behind.
  */
 export function syncNow(options: { pingsOnly?: boolean } = {}): Promise<void> {
-  if (running) return running;
+  if (running) {
+    if (runningPingsOnly && !options.pingsOnly) return running.then(() => syncNow(options));
+    return running;
+  }
+  runningPingsOnly = Boolean(options.pingsOnly);
   running = (async () => {
-    const { data } = await supabase.auth.getSession();
-    const guardId = data.session?.user.id;
+    const guardId = await currentGuardId();
     if (!guardId) return;
 
     setState({ syncing: true });
     try {
       if (!options.pingsOnly) {
-        await syncSos();
-        await syncScans();
+        await syncSos(guardId);
+        await syncScans(guardId);
         await syncAttachments(guardId);
       }
       await syncPings(guardId);

@@ -158,7 +158,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         const shift = snapshot.shift;
         if (shift?.status === 'active' && !tracking) {
           const perm = await Location.getForegroundPermissionsAsync();
-          if (perm.granted) await startTracking(shift.id);
+          if (perm.granted && guardId) await startTracking(shift.id, guardId);
         } else if (shift?.status !== 'active' && tracking) {
           await stopTracking();
         }
@@ -173,7 +173,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     if (!shift) return { ok: false, message: 'No shift is assigned to you.' };
     const { error: rpcError } = await supabase.rpc('start_shift', { p_shift_id: shift.id });
     if (rpcError) return { ok: false, message: friendlyError(rpcError) };
-    const tracking = await startTracking(shift.id).catch((e) => {
+    const tracking = await startTracking(shift.id, guardId!).catch((e) => {
       reportError(e, { where: 'startTracking' });
       return { ok: false, background: false };
     });
