@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+
+# Secrets: never commit real keys
+.env
+.env.local
+.env.*.local
+
+# Supabase CLI local state
+supabase/.branches
+supabase/.temp
