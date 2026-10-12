@@ -143,7 +143,7 @@ const toLocalScan = (r: ScanDbRow): LocalScan => ({
 export async function listLocalScans(guardId: string, fromIso: string, toIso: string): Promise<LocalScan[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<ScanDbRow>(
-    `SELECT s.*, (SELECT COUNT(*) FROM outbox_attachments a WHERE a.scan_id = s.id AND a.status = 'pending') AS pending_attachments
+    `SELECT s.*, (SELECT COUNT(*) FROM outbox_attachments a WHERE a.scan_id = s.id AND a.status <> 'synced') AS pending_attachments
        FROM outbox_scans s
       WHERE s.guard_id = ? AND s.device_time >= ? AND s.device_time < ?
       ORDER BY s.device_time DESC`,
@@ -166,7 +166,7 @@ export async function pendingScans(guardId: string): Promise<LocalScan[]> {
 export async function localScanCheckpoints(shiftId: string): Promise<Map<string, LocalScan>> {
   const db = await getDb();
   const rows = await db.getAllAsync<ScanDbRow>(
-    `SELECT s.*, 0 AS pending_attachments FROM outbox_scans s WHERE status <> 'failed' AND json_extract(payload, '$.p_shift_id') = ?`,
+    `SELECT s.*, 0 AS pending_attachments FROM outbox_scans s WHERE status = 'pending' AND json_extract(payload, '$.p_shift_id') = ?`,
     shiftId,
   );
   const map = new Map<string, LocalScan>();
@@ -254,7 +254,8 @@ export async function pendingCounts(guardId: string): Promise<PendingCounts> {
       (SELECT COUNT(*) FROM outbox_attachments a JOIN outbox_scans s ON s.id = a.scan_id
         WHERE a.status = 'pending' AND s.guard_id = ?1)                              AS attachments,
       (SELECT COUNT(*) FROM outbox_pings WHERE guard_id = ?1)                        AS pings,
-      (SELECT COUNT(*) FROM outbox_scans WHERE status = 'failed' AND guard_id = ?1)  AS failed`,
+      ((SELECT COUNT(*) FROM outbox_scans WHERE status = 'failed' AND guard_id = ?1) +
+       (SELECT COUNT(*) FROM outbox_attachments a JOIN outbox_scans s ON s.id = a.scan_id WHERE a.status = 'failed' AND s.guard_id = ?1)) AS failed`,
     guardId,
   );
   return r ?? { scans: 0, attachments: 0, pings: 0, failed: 0 };
@@ -333,7 +334,7 @@ export async function deleteSos(id: string) {
 export async function purgeOldRecords() {
   const db = await getDb();
   const cutoff = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-  const old = await db.getAllAsync<{ id: string }>(`SELECT id FROM outbox_scans WHERE status = 'synced' AND device_time < ?`, cutoff);
+  const old = await db.getAllAsync<{ id: string }>(`SELECT s.id FROM outbox_scans s WHERE s.status = 'synced' AND s.device_time < ? AND NOT EXISTS (SELECT 1 FROM outbox_attachments a WHERE a.scan_id = s.id AND a.status <> 'synced')`, cutoff);
   for (const { id } of old) {
     const dir = new Directory(Paths.document, 'outbox', id);
     try {

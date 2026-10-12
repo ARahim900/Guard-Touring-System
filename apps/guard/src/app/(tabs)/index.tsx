@@ -2,9 +2,10 @@
 // WORK tab: today's shift, the assigned route, and each checkpoint's status.
 // =============================================================================
 import { router } from 'expo-router';
-import { CalendarClock, CheckCircle2, Circle, CloudUpload, MapPin, PlayCircle, XCircle } from 'lucide-react-native';
+import { CalendarClock, CheckCircle2, Circle, CloudUpload, MapPin, XCircle } from 'lucide-react-native';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
+import { ShiftControls } from '@/components/ShiftControls';
 import { SosButton } from '@/components/SosButton';
 import { SyncBanner } from '@/components/SyncBanner';
 import { AppText, Badge, Button, Card, EmptyState, LoadingView, ProgressBar, Screen, SectionTitle } from '@/components/ui';
@@ -17,12 +18,10 @@ import type { ShiftStatus } from '@/lib/types';
 const SHIFT_BADGE: Record<ShiftStatus, { label: string; tone: 'success' | 'info' | 'neutral' | 'danger' | 'warning' }> = {
   scheduled: { label: 'Not started', tone: 'info' },
   active: { label: 'On shift', tone: 'success' },
-  completed: { label: 'Completed', tone: 'neutral' },
+  completed: { label: 'Closed', tone: 'neutral' },
   missed: { label: 'Missed', tone: 'danger' },
   cancelled: { label: 'Cancelled', tone: 'neutral' },
 };
-
-const GRACE_MS = 15 * 60 * 1000; // matches app_settings.grace_minutes
 
 function checkpointState(cp: CheckpointView) {
   if (cp.completed) {
@@ -31,8 +30,10 @@ function checkpointState(cp: CheckpointView) {
       : { label: `Done · ${formatTime(cp.scanned_at!)}`, tone: 'success' as const, Icon: CheckCircle2, color: colors.successText };
   }
   if (cp.pendingUpload) return { label: 'Pending upload', tone: 'info' as const, Icon: CloudUpload, color: colors.infoText };
-  if (new Date(cp.due_at).getTime() + GRACE_MS < Date.now()) {
-    return { label: 'Overdue', tone: 'danger' as const, Icon: XCircle, color: colors.dangerText };
+  if (cp.validation === 'flagged') return { label: 'Awaiting review', tone: 'warning' as const, Icon: Circle, color: colors.warningText };
+  if (cp.validation === 'rejected') return { label: 'Rejected — scan again', tone: 'danger' as const, Icon: XCircle, color: colors.dangerText };
+  if (new Date(cp.due_at).getTime() < Date.now()) {
+    return { label: 'Not verified by shift end', tone: 'danger' as const, Icon: XCircle, color: colors.dangerText };
   }
   return { label: `Due ${formatTime(cp.due_at)}`, tone: 'neutral' as const, Icon: Circle, color: colors.textMuted };
 }
@@ -43,7 +44,7 @@ export default function WorkScreen() {
 
   if (loading) return <LoadingView message="Loading your shift…" />;
 
-  const done = checkpoints.filter((c) => c.completed || c.pendingUpload).length;
+  const done = checkpoints.filter((c) => c.completed).length;
   const total = checkpoints.length;
   const firstName = profile?.full_name.split(' ')[0] ?? '';
 
@@ -54,6 +55,7 @@ export default function WorkScreen() {
         <AppText variant="heading">Hello{firstName ? `, ${firstName}` : ''}</AppText>
       </View>
 
+      <Button title="Account and settings" variant="ghost" onPress={() => router.navigate('/personal')} />
       <SyncBanner />
       {fromCache && updatedAt ? (
         <AppText variant="caption">Showing saved data from {formatDateTime(updatedAt)}. Pull down to refresh.</AppText>
@@ -86,25 +88,19 @@ export default function WorkScreen() {
               </AppText>
             ) : null}
             <View style={styles.rowBetween}>
-              <AppText variant="label">Checkpoints</AppText>
+              <AppText variant="label">Verified locations</AppText>
               <AppText variant="label" style={{ fontFamily: fonts.bold }}>
                 {done} / {total}
               </AppText>
             </View>
             <ProgressBar value={total ? (done / total) * 100 : 0} color={colors.success} />
-            {shift.status === 'scheduled' ? (
-              <Button
-                title="Start shift"
-                icon={PlayCircle}
-                onPress={() => router.navigate('/personal')}
-                accessibilityHint="Opens the Personal tab where you start your shift"
-              />
-            ) : null}
           </Card>
 
+          <ShiftControls />
+          <Button title="Scan location" onPress={() => router.push('/scan')} disabled={shift.status !== 'active'} />
           <SosButton />
 
-          <SectionTitle>Route checkpoints</SectionTitle>
+          <SectionTitle>Required locations · once this shift</SectionTitle>
           {checkpoints.length === 0 ? (
             <Card>
               <EmptyState icon={MapPin} title="No checkpoints" message="This route has no checkpoints yet." />

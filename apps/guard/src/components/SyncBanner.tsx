@@ -32,7 +32,7 @@ export function SyncBanner() {
     fg = colors.warningText;
   } else if (s.pending.failed > 0 && waiting === 0) {
     Icon = RefreshCw;
-    text = `${s.pending.failed} scan${s.pending.failed === 1 ? '' : 's'} could not be uploaded. See Histories.`;
+    text = `${s.pending.failed} record(s) or file(s) could not be uploaded. See History.`;
     bg = colors.dangerBg;
     fg = colors.dangerText;
   }

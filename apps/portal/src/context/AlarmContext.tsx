@@ -6,14 +6,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { friendlyError } from '@/lib/errors';
 import { ALARM_TYPE } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
 import type { Alarm } from '@/lib/types';
 import { useAuth } from './AuthContext';
 
 interface AlarmValue {
-  openCount: number;
-  sosOpen: number;
+  openCount: number | null;
+  sosOpen: number | null;
+  error: string | null;
   /** Increments on every realtime alarm event; pages watch it to reload. */
   version: number;
   refreshCounts: () => Promise<void>;
@@ -49,8 +51,9 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
   // Depend on the user id, not the session object: the session object changes on
   // every hourly token refresh, which would needlessly reconnect the alarm feed.
   const userId = session?.user.id;
-  const [openCount, setOpenCount] = useState(0);
-  const [sosOpen, setSosOpen] = useState(0);
+  const [openCount, setOpenCount] = useState<number | null>(null);
+  const [sosOpen, setSosOpen] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
   const refreshCounts = useCallback(async () => {
@@ -58,13 +61,21 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
       supabase.from('alarms').select('id', { count: 'exact', head: true }).eq('status', 'open'),
       supabase.from('alarms').select('id', { count: 'exact', head: true }).eq('status', 'open').eq('type', 'sos'),
     ]);
-    setOpenCount(all.count ?? 0);
-    setSosOpen(sos.count ?? 0);
+    if (all.error || sos.error) {
+      setError(friendlyError(all.error ?? sos.error));
+      setOpenCount(null);
+      setSosOpen(null);
+      return;
+    }
+    setError(null);
+    setOpenCount(all.count);
+    setSosOpen(sos.count);
   }, []);
 
   useEffect(() => {
     if (!userId) return;
     void refreshCounts();
+    const timer = setInterval(() => void refreshCounts(), 30000);
     const channel = supabase
       .channel('alarms-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alarms' }, async (payload) => {
@@ -94,11 +105,12 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
     return () => {
+      clearInterval(timer);
       void supabase.removeChannel(channel);
     };
   }, [userId, refreshCounts]);
 
-  const value = useMemo(() => ({ openCount, sosOpen, version, refreshCounts }), [openCount, sosOpen, version, refreshCounts]);
+  const value = useMemo(() => ({ openCount, sosOpen, error, version, refreshCounts }), [openCount, sosOpen, error, version, refreshCounts]);
   return <AlarmContext.Provider value={value}>{children}</AlarmContext.Provider>;
 }
 

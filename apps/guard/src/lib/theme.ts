@@ -6,7 +6,7 @@
 //   1. Larger type scale (16 px body instead of 14 px on the web dashboard).
 //   2. Status colours use the dark "text-on-tint" tokens for words, because
 //      the soft brand status colours (#84B59F etc.) are too faint as text
-//      outdoors. Brand teal (#A1D1D5) is used for accents and fills, never
+//      outdoors. Brand teal (#A4C5BB) is used for accents and fills, never
 //      for white text (white on teal fails contrast).
 // =============================================================================
 
@@ -15,7 +15,7 @@ export const colors = {
   primaryHover: '#3A3341',
   primaryLight: '#6B5F73',
   onPrimary: '#FFFFFF',
-  secondary: '#A1D1D5',
+  secondary: '#A4C5BB',
   secondaryLight: '#E8F1EF',
   secondaryActive: '#8AAFA5',
   onSecondary: '#1F2937',

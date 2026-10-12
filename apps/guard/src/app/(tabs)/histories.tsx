@@ -42,7 +42,7 @@ export default function HistoriesScreen() {
   const [tab, setTab] = useState<Tab>('records');
   return (
     <Screen scroll={false} contentStyle={{ paddingBottom: 0 }}>
-      <AppText variant="heading">Histories</AppText>
+      <AppText variant="heading">History</AppText>
       <Segmented
         value={tab}
         onChange={setTab}
@@ -181,7 +181,7 @@ function Records() {
                   {it.local?.status === 'pending' ? <Badge label="Pending upload" tone="info" /> : null}
                   {it.local?.status === 'failed' ? <Badge label="Upload failed" tone="danger" /> : null}
                   {it.local && it.local.status === 'synced' && it.local.pending_attachments > 0 ? (
-                    <Badge label={`${it.local.pending_attachments} file(s) pending upload`} tone="info" />
+                    <Badge label={`${it.local.pending_attachments} file(s) awaiting upload or retry`} tone="info" />
                   ) : null}
                   {it.validation ? <Badge {...VALIDATION_LABEL[it.validation]} /> : null}
                 </View>
@@ -193,7 +193,7 @@ function Records() {
                     <AppText variant="caption">{it.attachments} attachment(s)</AppText>
                   </View>
                 ) : null}
-                {it.local?.status === 'failed' ? (
+                {it.local && (it.local.status === 'failed' || it.local.pending_attachments > 0) ? (
                   <>
                     <AppText variant="label" style={{ color: colors.dangerText }}>
                       {it.local.last_error}

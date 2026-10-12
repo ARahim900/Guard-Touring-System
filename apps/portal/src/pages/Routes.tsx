@@ -1,12 +1,4 @@
-// =============================================================================
-// Routes: an ordered list of checkpoints, each with a target time expressed
-// as "minutes after the shift starts". Example: a 22:00 shift with offsets
-// 0, 20, 45 expects checkpoints at 22:00, 22:20 and 22:45 (+ grace period).
-//
-// Editing rule (enforced in the database): shifts that have already started
-// keep the checkpoints they were patrolled against, so past reports never
-// change. Shifts not yet started pick up your changes automatically.
-// =============================================================================
+// Each route location must be visited once before the shift ends. Order is guidance.
 import { ArrowDown, ArrowUp, Plus, Route as RouteIcon, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -23,13 +15,13 @@ interface Draft {
   description: string;
   contractor_id: string;
   active: boolean;
-  items: { checkpoint_id: string; due_offset_min: number }[];
+  items: { checkpoint_id: string }[];
 }
 
 export default function RoutesPage() {
-  const routes = useAsync(async () => unwrap(await supabase.from('routes').select('*, route_checkpoints(count)').order('name')) as Route[], []);
-  const checkpoints = useAsync(async () => unwrap(await supabase.from('checkpoints').select('*').order('name')) as Checkpoint[], []);
-  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('*').order('name')) as Contractor[], []);
+  const routes = useAsync(async () => unwrap(await supabase.from('routes').select('id, name, description, contractor_id, active, route_checkpoints(count)').order('name')) as Route[], []);
+  const checkpoints = useAsync(async () => unwrap(await supabase.from('checkpoints').select('id, name, code, nfc_uid, description, latitude, longitude, radius_m, active').order('name')) as Checkpoint[], []);
+  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('id, name, contract_ref, contact_name, contact_phone, contact_email, active').order('name')) as Contractor[], []);
 
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -44,7 +36,7 @@ export default function RoutesPage() {
     setLoadingDraft(true);
     (async () => {
       const r = routes.data?.find((x) => x.id === selected);
-      const { data, error } = await supabase.from('route_checkpoints').select('*').eq('route_id', selected).order('sequence');
+      const { data, error } = await supabase.from('route_checkpoints').select('route_id, checkpoint_id, sequence, due_offset_min').eq('route_id', selected).order('sequence');
       setLoadingDraft(false);
       if (error || !r) return toast.error(friendlyError(error));
       setDraft({
@@ -53,7 +45,7 @@ export default function RoutesPage() {
         description: r.description ?? '',
         contractor_id: r.contractor_id ?? '',
         active: r.active,
-        items: (data as RouteCheckpoint[]).map((rc) => ({ checkpoint_id: rc.checkpoint_id, due_offset_min: rc.due_offset_min })),
+        items: (data as RouteCheckpoint[]).map((rc) => ({ checkpoint_id: rc.checkpoint_id })),
       });
     })();
   }, [selected, routes.data]);
@@ -92,7 +84,7 @@ export default function RoutesPage() {
         await supabase
           .from('route_checkpoints')
           .upsert(
-            draft.items.map((it, idx) => ({ route_id: routeId, checkpoint_id: it.checkpoint_id, sequence: idx + 1, due_offset_min: it.due_offset_min })),
+            draft.items.map((it, idx) => ({ route_id: routeId, checkpoint_id: it.checkpoint_id, sequence: idx + 1, due_offset_min: 0 })),
             { onConflict: 'route_id,checkpoint_id' },
           )
           .select('route_id'),
@@ -109,7 +101,7 @@ export default function RoutesPage() {
 
   return (
     <>
-      <PageHeader title="Routes" subtitle="Order the checkpoints and set when each one is due." actions={<Button icon={Plus} onClick={() => setSelected('new')}>New route</Button>} />
+      <PageHeader title="Routes" subtitle="Choose required locations. Visit each once before the shift ends; the order is guidance." actions={<Button icon={Plus} onClick={() => setSelected('new')}>New route</Button>} />
       <div className="grid gap-[14px] lg:grid-cols-[320px_1fr]">
         <Card>
           <ErrorNote message={routes.error} />
@@ -166,21 +158,6 @@ export default function RoutesPage() {
                     <li key={it.checkpoint_id} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
                       <span className="flex size-7 items-center justify-center rounded-full bg-secondary-light text-sm font-bold text-primary">{i + 1}</span>
                       <span className="min-w-40 flex-1 font-medium">{cpName(it.checkpoint_id)}</span>
-                      <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                        Due at shift start +
-                        <Input
-                          type="number"
-                          min={0}
-                          className="h-8 w-20"
-                          value={it.due_offset_min}
-                          onChange={(e) => {
-                            const items = [...draft.items];
-                            items[i] = { ...it, due_offset_min: Math.max(0, Number(e.target.value) || 0) };
-                            setDraft({ ...draft, items });
-                          }}
-                        />
-                        min
-                      </label>
                       <Button size="sm" variant="ghost" onClick={() => move(i, -1)} aria-label="Move up" disabled={i === 0}><ArrowUp className="size-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => move(i, 1)} aria-label="Move down" disabled={i === draft.items.length - 1}><ArrowDown className="size-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => setDraft({ ...draft, items: draft.items.filter((_, k) => k !== i) })} aria-label="Remove"><Trash2 className="size-4 text-danger-text" /></Button>
@@ -197,8 +174,7 @@ export default function RoutesPage() {
                     icon={Plus}
                     disabled={!addId}
                     onClick={() => {
-                      const last = draft.items[draft.items.length - 1]?.due_offset_min ?? -15;
-                      setDraft({ ...draft, items: [...draft.items, { checkpoint_id: addId, due_offset_min: last + 15 }] });
+                      setDraft({ ...draft, items: [...draft.items, { checkpoint_id: addId }] });
                       setAddId('');
                     }}
                   >

@@ -1,236 +1,60 @@
-// =============================================================================
-// Monthly contractor report as a PDF (built in the browser with jsPDF).
-// =============================================================================
-// Totals are WEIGHTED: overall completion = all checkpoints visited ÷ all
-// checkpoints due, not an average of each guard's percentage (an average
-// would let a guard with 2 checkpoints count as much as one with 400).
-// =============================================================================
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 
-import { guardName, SHIFT_STATUS } from './labels';
-import { formatDateTime, formatDay, formatTime } from './time';
-import type { DailyLogRow, Incident, ReportRow } from './types';
+import { coordinates, evidenceTime, reportTotals, visitRows, type PatrolReport } from './patrolReport';
 
-const PRIMARY: [number, number, number] = [78, 68, 86]; // #4E4456
-const TEAL: [number, number, number] = [161, 209, 213]; // #A1D1D5
-const MUTED: [number, number, number] = [107, 114, 128];
+const PRIMARY: [number, number, number] = [78, 68, 86];
+const TEAL: [number, number, number] = [164, 197, 187];
 
-export interface ReportInput {
-  contractorName: string;
-  monthLabel: string; // e.g. "October 2026"
-  rows: ReportRow[];
-  incidents: Incident[];
-  /** One row per shift (normally one per day), with the guard on duty. */
-  daily: DailyLogRow[];
-  generatedBy: string;
-  /** Muscat Bay mark as a PNG data URL (see loadLogo). Optional. */
-  logoDataUrl?: string | null;
-}
-
-export function totals(rows: ReportRow[]) {
-  const sum = (k: keyof ReportRow) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
-  const expected = sum('expected');
-  const completed = sum('completed');
-  const onTime = sum('on_time');
-  return {
-    guards: rows.length,
-    shifts: sum('shifts'),
-    shiftsMissed: sum('shifts_missed'),
-    expected,
-    completed,
-    onTime,
-    completion: expected ? (completed / expected) * 100 : null,
-    punctuality: completed ? (onTime / completed) * 100 : null,
-    incidents: sum('incidents'),
-    sos: sum('sos'),
-    rejected: sum('rejected_scans'),
-  };
-}
-
-const pct = (v: number | null) => (v === null ? '–' : `${v.toFixed(1)}%`);
-
-export function buildReportPdf(input: ReportInput): jsPDF {
+export function buildReportPdf(report: PatrolReport): jsPDF {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth();
-  const t = totals(input.rows);
-
-  // ---- Header band
+  const totals = reportTotals(report);
+  const width = doc.internal.pageSize.getWidth();
   doc.setFillColor(...PRIMARY);
-  doc.rect(0, 0, W, 26, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
+  doc.rect(0, 0, width, 25, 'F');
+  doc.setTextColor(255);
   doc.setFontSize(16);
-  doc.text('Muscat Bay · Security Patrol Performance Report', 14, 12);
-  doc.setFont('helvetica', 'normal');
+  doc.text('Muscat Bay | Night patrol report', 14, 12);
   doc.setFontSize(10);
-  doc.text(`${input.contractorName}  ·  ${input.monthLabel}`, 14, 20);
-  doc.setFillColor(...TEAL);
-  doc.rect(0, 26, W, 1.5, 'F');
-  if (input.logoDataUrl) {
-    // The logo is purple, so it sits on a white tile inside the purple band.
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(W - 34, 3, 20, 20, 2, 2, 'F');
-    doc.addImage(input.logoDataUrl, 'PNG', W - 32, 5, 16, 16);
-  }
-
-  // ---- KPI boxes
-  const kpis: [string, string][] = [
-    ['Checkpoint completion', pct(t.completion)],
-    ['Punctuality', pct(t.punctuality)],
-    ['Checkpoints visited / due', `${t.completed} / ${t.expected}`],
-    ['Shifts (missed)', `${t.shifts} (${t.shiftsMissed})`],
-    ['Incidents reported', String(t.incidents)],
-    ['SOS raised', String(t.sos)],
-  ];
-  const boxW = (W - 28 - 5 * 4) / 6;
-  kpis.forEach(([label, value], i) => {
-    const x = 14 + i * (boxW + 4);
-    doc.setDrawColor(229, 231, 235);
-    doc.setFillColor(247, 248, 249);
-    doc.roundedRect(x, 33, boxW, 20, 2, 2, 'FD');
-    doc.setTextColor(...MUTED);
-    doc.setFontSize(8);
-    doc.text(label, x + 3, 39);
-    doc.setTextColor(...PRIMARY);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text(value, x + 3, 48);
-    doc.setFont('helvetica', 'normal');
-  });
-
-  // ---- Per-guard table
-  autoTable(doc, {
-    startY: 60,
-    head: [['Guard / login', 'Emp. no.', 'Shifts', 'Missed shifts', 'Due', 'Visited', 'Completion', 'On time', 'Punctuality', 'Incidents', 'SOS', 'Rejected scans']],
-    body: input.rows.map((r) => [
-      r.full_name,
-      r.employee_no ?? '–',
-      r.shifts,
-      r.shifts_missed,
-      r.expected,
-      r.completed,
-      pct(r.completion_rate === null ? null : Number(r.completion_rate)),
-      r.on_time,
-      pct(r.punctuality_rate === null ? null : Number(r.punctuality_rate)),
-      r.incidents,
-      r.sos,
-      r.rejected_scans,
-    ]),
-    foot: [['Total', '', t.shifts, t.shiftsMissed, t.expected, t.completed, pct(t.completion), t.onTime, pct(t.punctuality), t.incidents, t.sos, t.rejected]],
-    showFoot: 'lastPage', // the Total row only once, at the end
-    theme: 'grid',
-    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2 },
-    headStyles: { fillColor: PRIMARY, textColor: 255 },
-    footStyles: { fillColor: [232, 241, 239], textColor: PRIMARY, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [247, 248, 249] },
-    margin: { left: 14, right: 14, bottom: 24 }, // room for the footer and definitions
-  });
-
-  const lastY = () => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-  /** Start a new section, on a new page if it would collide with the footer. */
-  const sectionStart = () => {
-    const next = lastY() + 10;
-    if (next > doc.internal.pageSize.getHeight() - 40) {
-      doc.addPage();
-      return 20;
-    }
-    return next;
-  };
-
-  // ---- Daily patrol log (security shares one login, so this names the guard on duty each day)
-  let y = sectionStart();
+  doc.text(`${report.from_date} to ${report.to_date} | ${report.contractor_name ?? 'All contractors'} | Muscat time (UTC+4)`, 14, 20);
   doc.setTextColor(...PRIMARY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(`Daily patrol log (${input.daily.length})`, 14, y);
-  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Required: ${totals.required}   Verified: ${totals.verified}   Awaiting review: ${totals.review}   Rejected: ${totals.rejected}   Unvisited: ${totals.unvisited}`, 14, 34);
+  doc.text('One verified visit per checkpoint per shift. Pending phone uploads are not visible until received.', 14, 41);
+  doc.text(`Not yet visited (shift still open): ${totals.remaining} | Missing attachments: ${totals.missingAttachments}`, 14, 48);
   autoTable(doc, {
-    startY: y + 3,
-    head: [['Date', 'Guard on duty', 'ID', 'Route', 'Status', 'Started', 'Ended', 'Visited / due', 'On time', 'Incidents', 'SOS']],
-    body: input.daily.map((d) => [
-      formatDay(`${d.patrol_date}T12:00:00+04:00`),
-      d.on_duty_name,
-      d.on_duty_ref ?? '–',
-      d.route_name,
-      SHIFT_STATUS[d.status].label,
-      d.actual_start ? formatTime(d.actual_start) : '–',
-      d.actual_end ? formatTime(d.actual_end) : '–',
-      `${d.visited} / ${d.checkpoints_total}`,
-      d.on_time,
-      d.incidents,
-      d.sos,
-    ]),
-    theme: 'grid',
-    styles: { font: 'helvetica', fontSize: 8, cellPadding: 1.8 },
-    headStyles: { fillColor: PRIMARY, textColor: 255 },
-    alternateRowStyles: { fillColor: [247, 248, 249] },
-    margin: { left: 14, right: 14, bottom: 24 },
+    startY: 55,
+    head: [['Shift date', 'Guard on duty / login', 'Route', 'Status', 'Scheduled start / end', 'Actual start / end']],
+    body: report.shifts.map((s) => [s.patrol_date, `${s.guard_name ?? 'Unconfirmed'} / ${s.login_name}`, s.route_name,
+      s.auto_closed_at ? 'Auto-closed; finish unconfirmed' : s.status,
+      `${evidenceTime(s.scheduled_start)}\n${evidenceTime(s.scheduled_end)}`,
+      `${evidenceTime(s.actual_start)}\n${evidenceTime(s.actual_end)}`]),
+    styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: PRIMARY },
+    margin: { bottom: 20 },
   });
-
-  // ---- Incidents
-  y = sectionStart();
-  doc.setTextColor(...PRIMARY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(`Incidents reported (${input.incidents.length})`, 14, y);
-  doc.setFont('helvetica', 'normal');
-  if (input.incidents.length) {
-    autoTable(doc, {
-      startY: y + 3,
-      head: [['Date', 'Guard', 'Checkpoint', 'Description', 'Severity', 'Status']],
-      body: input.incidents.map((i) => [formatDateTime(i.created_at), guardName(i), i.checkpoints?.name ?? '', i.description, i.severity, i.status.replace('_', ' ')]),
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 1.8 },
-      headStyles: { fillColor: PRIMARY, textColor: 255 },
-      columnStyles: { 3: { cellWidth: 110 } },
-      margin: { left: 14, right: 14, bottom: 24 },
-    });
-  } else {
-    doc.setFontSize(9);
-    doc.setTextColor(...MUTED);
-    doc.text('None.', 14, y + 6);
-  }
-
-  // ---- Definitions + footer on every page
-  const pages = doc.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
+  doc.addPage();
+  doc.setFontSize(13);
+  doc.text('Required locations and visit evidence', 14, 14);
+  autoTable(doc, {
+    startY: 20,
+    head: [['Shift date', 'Guard', 'Checkpoint', 'Result / scans', 'Captured / received', 'GPS coordinates / accuracy', 'Issue notes']],
+    body: visitRows(report).map(({ shift: s, checkpoint: c, scan, status }) => [
+      s.patrol_date, s.guard_name ?? 'Unconfirmed', c.name, `${status} / ${c.scans.length}`,
+      `${evidenceTime(scan?.device_time ?? null)}\n${evidenceTime(scan?.server_time ?? null)}`,
+      `${coordinates(scan)}\n${scan?.accuracy_m === null || scan?.accuracy_m === undefined ? 'Unknown' : `+/- ${scan.accuracy_m} m`}`,
+      c.scans.filter((x) => x.status === 'issue').map((x) => x.note ?? '').join('\n'),
+    ]),
+    styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: PRIMARY },
+    alternateRowStyles: { fillColor: [247, 248, 249] }, margin: { bottom: 20 },
+  });
+  for (let p = 1; p <= doc.getNumberOfPages(); p++) {
     doc.setPage(p);
-    const H = doc.internal.pageSize.getHeight();
-    doc.setFontSize(7.5);
-    doc.setTextColor(...MUTED);
-    if (p === pages) {
-      doc.text(
-        'Definitions: Completion = checkpoints visited ÷ checkpoints due. Punctuality = visits within the grace period ÷ checkpoints visited. ' +
-          'A visit counts only if the server confirmed the guard was within the checkpoint radius, inside the shift, with genuine GPS. ' +
-          'Rejected scans did not count. All times Muscat (UTC+4).',
-        14,
-        H - 14,
-        { maxWidth: W - 28 },
-      );
-    }
-    doc.text(`Generated ${formatDateTime(new Date())} by ${input.generatedBy} · MB Patrol`, 14, H - 6);
-    doc.text(`Page ${p} of ${pages}`, W - 14, H - 6, { align: 'right' });
+    const height = doc.internal.pageSize.getHeight();
+    doc.setDrawColor(...TEAL);
+    doc.line(14, height - 14, width - 14, height - 14);
+    doc.setFontSize(8);
+    doc.text(`Generated ${evidenceTime(report.generated_at)} | Original times retained; unknown readings remain unknown.`, 14, height - 8);
+    doc.text(`${p} / ${doc.getNumberOfPages()}`, width - 14, height - 8, { align: 'right' });
   }
-
   return doc;
-}
-
-export const monthLabel = (month: string) =>
-  new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'Asia/Muscat' }).format(new Date(`${month}-15T12:00:00+04:00`));
-
-
-/** Read the Muscat Bay mark from the portal's public folder as a data URL. */
-export async function loadLogo(): Promise<string | null> {
-  try {
-    const blob = await (await fetch('/muscat-bay-mark.png')).blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null; // the report still works without the logo
-  }
 }

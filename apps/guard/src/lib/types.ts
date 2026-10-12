@@ -32,6 +32,7 @@ export interface Shift {
   scheduled_end: string;
   actual_start: string | null;
   actual_end: string | null;
+  auto_closed_at: string | null;
   status: ShiftStatus;
   notes: string | null;
   /** Name typed by the guard at Start shift (shared security login). */

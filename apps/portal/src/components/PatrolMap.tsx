@@ -26,7 +26,7 @@ export const icons = {
   checkpoint: (label: string, done?: boolean) =>
     L.divIcon({
       className: '',
-      html: `<div style="background:${done ? '#84B59F' : '#A1D1D5'};color:#4E4456;border:2px solid #4E4456;border-radius:6px;padding:1px 6px;font:600 11px 'DM Sans Variable',sans-serif;white-space:nowrap;transform:translate(-50%,-50%);display:inline-block">${escape(label)}</div>`,
+      html: `<div style="background:${done ? '#84B59F' : '#A4C5BB'};color:#4E4456;border:2px solid #4E4456;border-radius:6px;padding:1px 6px;font:600 11px 'DM Sans Variable',sans-serif;white-space:nowrap;transform:translate(-50%,-50%);display:inline-block">${escape(label)}</div>`,
       iconSize: [0, 0],
     }),
   guard: (name: string, stale: boolean) =>
@@ -78,7 +78,7 @@ export function CheckpointLayer({ checkpoints, doneIds }: { checkpoints: Checkpo
     <>
       {checkpoints.map((c) => (
         <span key={c.id}>
-          <Circle center={[c.latitude, c.longitude]} radius={c.radius_m} pathOptions={{ color: '#4E4456', weight: 1, fillColor: '#A1D1D5', fillOpacity: 0.25 }} />
+          <Circle center={[c.latitude, c.longitude]} radius={c.radius_m} pathOptions={{ color: '#4E4456', weight: 1, fillColor: '#A4C5BB', fillOpacity: 0.25 }} />
           <Marker position={[c.latitude, c.longitude]} icon={icons.checkpoint(c.name, doneIds?.has(c.id))}>
             <Popup>
               <strong>{c.name}</strong>

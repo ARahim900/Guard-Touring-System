@@ -1,160 +1,135 @@
-// Monthly report per contractor: preview on screen, download as PDF.
-import { BarChart3, CheckCircle2, Clock, FileDown, Play, ShieldAlert, Users } from 'lucide-react';
+import { CheckCircle2, ClipboardList, FileDown, Play, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, StatCard, Table, Td } from '@/components/ui';
-import { useAuth } from '@/context/AuthContext';
+import { ScanDetail } from '@/components/ScanDetail';
+import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, StatCard, Table, Td } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
-import { SHIFT_STATUS } from '@/lib/labels';
-import { buildReportPdf, loadLogo, monthLabel, totals } from '@/lib/reportPdf';
+import { buildReportCsv, coordinates, evidenceTime, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
+import { buildReportPdf } from '@/lib/reportPdf';
 import { supabase } from '@/lib/supabase';
-import { dayKey, formatDay, formatTime } from '@/lib/time';
-import type { Contractor, DailyLogRow, Incident, ReportRow } from '@/lib/types';
+import { dayKey } from '@/lib/time';
 import { unwrap, useAsync } from '@/lib/useAsync';
 
-const pct = (v: number | null) => (v === null ? '–' : `${Number(v).toFixed(1)}%`);
+const PAGE_SIZE = 50;
 
 export default function ReportsPage() {
-  const { profile } = useAuth();
-  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('*').order('name')) as Contractor[], []);
+  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('id, name').order('name')), []);
   const [contractorId, setContractorId] = useState('');
-  const [month, setMonth] = useState(dayKey().slice(0, 7));
-  const [rows, setRows] = useState<ReportRow[] | null>(null);
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [daily, setDaily] = useState<DailyLogRow[]>([]);
+  const [from, setFrom] = useState(dayKey());
+  const [to, setTo] = useState(dayKey());
+  const [report, setReport] = useState<PatrolReport | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<VisitRow | null>(null);
 
   async function run() {
-    if (!contractorId) return toast.error('Choose a contractor.');
+    if (!from || !to || from > to) return setError('Choose a valid start and end date.');
     setBusy(true);
+    setError(null);
+    setReport(null);
     try {
-      const args = { p_contractor_id: contractorId, p_month: `${month}-01` };
-      const [data, log] = await Promise.all([
-        supabase.rpc('contractor_report', args).then((r) => unwrap(r) as ReportRow[]),
-        supabase.rpc('daily_patrol_log', args).then((r) => unwrap(r) as DailyLogRow[]),
-      ]);
-      const guardIds = data.map((r) => r.guard_id);
-      // Month boundaries in Muscat time (midnight on the 1st, UTC+4).
-      const [y, m] = month.split('-').map(Number);
-      const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
-      const from = new Date(`${month}-01T00:00:00+04:00`);
-      const to = new Date(`${next}-01T00:00:00+04:00`);
-      const inc = guardIds.length
-        ? (unwrap(
-            await supabase
-              .from('incidents')
-              .select('*, profiles!incidents_guard_id_fkey(full_name), shifts!incidents_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name)')
-              .in('guard_id', guardIds)
-              .gte('created_at', from.toISOString())
-              .lt('created_at', to.toISOString())
-              .order('created_at'),
-          ) as Incident[])
-        : [];
-      setRows(data);
-      setDaily(log);
-      setIncidents(inc);
-      toast.success('Report ready.');
+      const result = unwrap(await supabase.rpc('patrol_report', { p_from: from, p_to: to, p_contractor_id: contractorId || null })) as PatrolReport;
+      setReport(result);
+      setPage(0);
     } catch (e) {
-      toast.error(friendlyError(e));
+      setError(friendlyError(e));
     } finally {
       setBusy(false);
     }
   }
 
-  async function download() {
-    if (!rows) return;
-    const contractor = contractors.data?.find((c) => c.id === contractorId);
-    const doc = buildReportPdf({
-      contractorName: contractor?.name ?? 'Contractor',
-      monthLabel: monthLabel(month),
-      rows,
-      incidents,
-      daily,
-      generatedBy: profile?.full_name ?? 'supervisor',
-      logoDataUrl: await loadLogo(),
-    });
-    const safe = (contractor?.name ?? 'contractor').replace(/[^a-z0-9]+/gi, '_');
-    doc.save(`MB_Patrol_Report_${safe}_${month}.pdf`);
-    toast.success('PDF downloaded.');
+  async function download(format: 'pdf' | 'csv') {
+    if (!report) return;
+    setExporting(true);
+    try {
+      const filename = `MB_Patrol_${report.from_date}_${report.to_date}`;
+      if (format === 'pdf') buildReportPdf(report).save(`${filename}.pdf`);
+      else {
+        const url = URL.createObjectURL(new Blob([buildReportCsv(report)], { type: 'text/csv;charset=utf-8;' }));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${filename}.csv`;
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    } catch (e) {
+      toast.error(friendlyError(e, 'Could not export the report.'));
+    } finally {
+      setExporting(false);
+    }
   }
 
-  const t = rows ? totals(rows) : null;
+  const rows = report ? visitRows(report) : [];
+  const totals = report ? reportTotals(report) : null;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
 
   return (
     <>
-      <PageHeader title="Monthly reports" subtitle="Completion and punctuality per guard, for one contractor and one month." />
+      <PageHeader title="Patrol reports" subtitle="Choose any date range. Visits after midnight stay with the date the shift started." />
       <Card className="mb-[14px]">
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="Contractor" className="w-72">
-            <Select value={contractorId} onChange={(e) => { setContractorId(e.target.value); setRows(null); }}>
-              <option value="">Choose…</option>
+          <Field label="From date"><Input type="date" disabled={busy} value={from} onChange={(e) => { setFrom(e.target.value); setReport(null); }} /></Field>
+          <Field label="To date"><Input type="date" disabled={busy} value={to} min={from} onChange={(e) => { setTo(e.target.value); setReport(null); }} /></Field>
+          <Field label="Contractor">
+            <Select disabled={busy} value={contractorId} onChange={(e) => { setContractorId(e.target.value); setReport(null); }}>
+              <option value="">All contractors</option>
               {contractors.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </Field>
-          <Field label="Month" className="w-48">
-            <Input type="month" value={month} max={dayKey().slice(0, 7)} onChange={(e) => { setMonth(e.target.value); setRows(null); }} />
-          </Field>
-          <Button icon={Play} loading={busy} onClick={() => void run()}>Run report</Button>
-          <Button variant="secondary" icon={FileDown} disabled={!rows} onClick={() => void download()}>Download PDF</Button>
+          <Button icon={Play} loading={busy} onClick={() => void run()}>Generate report</Button>
+          <Button variant="secondary" icon={FileDown} disabled={!report || exporting} onClick={() => void download('pdf')}>PDF</Button>
+          <Button variant="outline" icon={FileDown} disabled={!report || exporting} onClick={() => void download('csv')}>Excel / CSV</Button>
         </div>
+        <ErrorNote message={error ?? contractors.error} />
       </Card>
-
-      {!rows ? (
-        <Card>
-          <EmptyState icon={BarChart3} title="Choose a contractor and month" message="Then press Run report to preview the figures before downloading the PDF." />
-        </Card>
-      ) : (
+      {report && totals ? (
         <>
+          <p className="mb-4 text-sm text-muted-foreground">Generated {evidenceTime(report.generated_at)} · Muscat time. Only received records are shown; phone uploads may still be pending. Cancelled shifts are excluded from totals.</p>
           <div className="mb-[14px] grid gap-[14px] sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard icon={CheckCircle2} tone="success" label="Checkpoint completion" value={pct(t!.completion)} hint={`${t!.completed} of ${t!.expected} due`} />
-            <StatCard icon={Clock} tone="info" label="Punctuality" value={pct(t!.punctuality)} hint={`${t!.onTime} on time`} />
-            <StatCard icon={Users} label="Guards / shifts" value={`${t!.guards} / ${t!.shifts}`} hint={`${t!.shiftsMissed} missed shifts`} />
-            <StatCard icon={ShieldAlert} tone="warning" label="Incidents / SOS" value={`${t!.incidents} / ${t!.sos}`} hint={`${t!.rejected} rejected scans`} />
+            <StatCard icon={CheckCircle2} label="Verified / required" value={`${totals.verified} / ${totals.required}`} hint={totals.completion === null ? 'No required locations' : `${totals.completion.toFixed(1)}% verified`} />
+            <StatCard icon={ShieldAlert} label="Awaiting review" value={totals.review} hint={`${totals.rejected} rejected`} />
+            <StatCard icon={ClipboardList} label="Unvisited after shift end" value={totals.unvisited} hint={`${totals.remaining} not yet visited in open shifts`} />
+            <StatCard icon={FileDown} label="Missing attachments" value={totals.missingAttachments} hint="Evidence still awaiting upload or recovery" />
           </div>
-          <Card title={`${monthLabel(month)} · daily patrol log`} className="mb-[14px]">
-            <Table head={['Date', 'Guard on duty', 'ID', 'Route', 'Status', 'Started / ended', 'Visited', 'On time', 'Incidents', 'SOS']}>
-              {daily.map((d) => (
-                <tr key={d.shift_id}>
-                  <Td className="whitespace-nowrap">{formatDay(`${d.patrol_date}T12:00:00+04:00`)}</Td>
-                  <Td className="font-medium">{d.on_duty_name}</Td>
-                  <Td>{d.on_duty_ref ?? '–'}</Td>
-                  <Td>{d.route_name}</Td>
-                  <Td><Badge {...SHIFT_STATUS[d.status]} /></Td>
-                  <Td className="whitespace-nowrap text-xs text-muted-foreground">
-                    {d.actual_start ? formatTime(d.actual_start) : '–'} / {d.actual_end ? formatTime(d.actual_end) : '–'}
-                  </Td>
-                  <Td className="font-semibold">{d.visited} / {d.checkpoints_total}</Td>
-                  <Td>{d.on_time}</Td>
-                  <Td>{d.incidents}</Td>
-                  <Td>{d.sos}</Td>
+          <Card title="Shift log" className="mb-[14px]">
+            <Table head={['Shift date', 'Guard on duty', 'Route', 'Shift status', 'Actual start / end']}>
+              {report.shifts.map((s) => (
+                <tr key={s.id}>
+                  <Td>{s.patrol_date}</Td><Td>{s.guard_name ?? 'Unconfirmed'}<p className="text-xs text-muted-foreground">Login: {s.login_name}</p></Td>
+                  <Td>{s.route_name}{!s.checkpoints.length ? <p>No checkpoints configured</p> : null}</Td>
+                  <Td>{s.auto_closed_at ? 'Automatically closed; finish unconfirmed' : s.status}</Td>
+                  <Td>{evidenceTime(s.actual_start)}<br />{evidenceTime(s.actual_end)}</Td>
                 </tr>
               ))}
             </Table>
-            {daily.length === 0 ? <p className="py-4 text-sm text-muted-foreground">No patrols were scheduled in this month.</p> : null}
+            {!report.shifts.length ? <p className="py-4">No shifts scheduled in this range.</p> : null}
           </Card>
-          <Card title={`${monthLabel(month)} · per login`}>
-            <Table head={['Guard', 'Emp. no.', 'Shifts', 'Missed', 'Due', 'Visited', 'Completion', 'Punctuality', 'Incidents', 'SOS', 'Rejected']}>
-              {rows.map((r) => (
-                <tr key={r.guard_id}>
-                  <Td className="font-medium">{r.full_name}</Td>
-                  <Td>{r.employee_no ?? '–'}</Td>
-                  <Td>{r.shifts}</Td>
-                  <Td>{r.shifts_missed}</Td>
-                  <Td>{r.expected}</Td>
-                  <Td>{r.completed}</Td>
-                  <Td className="font-semibold">{pct(r.completion_rate)}</Td>
-                  <Td className="font-semibold">{pct(r.punctuality_rate)}</Td>
-                  <Td>{r.incidents}</Td>
-                  <Td>{r.sos}</Td>
-                  <Td>{r.rejected_scans}</Td>
+          <Card title="Required locations">
+            <Table head={['Shift date', 'Guard', 'Checkpoint', 'Result', 'Captured / received (Muscat)', 'Position / accuracy', 'Evidence']}>
+              {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((r) => (
+                <tr key={`${r.shift.id}:${r.checkpoint.id}`}>
+                  <Td>{r.shift.patrol_date}</Td><Td>{r.shift.guard_name ?? 'Unconfirmed'}</Td><Td>{r.checkpoint.name}</Td>
+                  <Td><Badge label={r.status} tone={r.status === 'Verified' ? 'brand' : 'neutral'} /></Td>
+                  <Td>{evidenceTime(r.scan?.device_time ?? null)}<br />{evidenceTime(r.scan?.server_time ?? null)}</Td>
+                  <Td>{coordinates(r.scan)}<br />{r.scan?.accuracy_m == null ? 'Accuracy unknown' : `±${r.scan.accuracy_m} m`}</Td>
+                  <Td><Button size="sm" variant="outline" disabled={!r.checkpoint.scans.length} onClick={() => setSelected(r)}>{r.checkpoint.scans.length} scan(s)</Button></Td>
                 </tr>
               ))}
             </Table>
-            {rows.length === 0 ? <p className="py-4 text-sm text-muted-foreground">This contractor has no guards with activity in this month.</p> : null}
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</Button>
+              <span className="text-sm">Page {page + 1} of {pages} · {rows.length} locations</span>
+              <Button variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>Next</Button>
+            </div>
           </Card>
         </>
-      )}
+      ) : !busy ? <Card><EmptyState icon={ClipboardList} title="Choose your dates" message="Generate a report to review all required locations, including locations without a scan." /></Card> : null}
+      <Modal open={Boolean(selected)} wide title={`Evidence · ${selected?.checkpoint.name ?? ''}`} onClose={() => setSelected(null)}>
+        {selected?.checkpoint.scans.map((s) => <div key={s.id} className="mb-6 border-b border-border pb-6"><ScanDetail scanId={s.id} onChanged={() => { setSelected(null); void run(); }} /></div>)}
+      </Modal>
     </>
   );
 }

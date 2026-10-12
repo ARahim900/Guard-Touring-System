@@ -68,7 +68,7 @@ export default function ScanScreen() {
     return () => void cancelNfc();
   }, []);
 
-  const usable = shift && (shift.status === 'active' || shift.status === 'scheduled');
+  const usable = shift && shift.status === 'active';
 
   if (!usable) {
     return (
@@ -110,6 +110,9 @@ export default function ScanScreen() {
 
     let gps = latestFix.current;
     if (!gps || Date.now() - gps.timestamp > FIX_MAX_AGE_MS) gps = await getFix(8000);
+
+    if (gps && Math.abs(Date.now() - gps.timestamp) > FIX_MAX_AGE_MS) gps = null;
+    if (found.cp.completed) toast.info('Already verified this shift. This additional scan stays in the history.');
 
     setScanDraft({
       scanId: Crypto.randomUUID(),
@@ -167,14 +170,9 @@ export default function ScanScreen() {
         <View style={styles.gps}>
           <View style={[styles.dot, { backgroundColor: fix ? (fix.accuracy && fix.accuracy <= 30 ? colors.success : colors.warning) : colors.textMuted }]} />
           <AppText variant="label" style={{ color: colors.onPrimary }}>
-            {fix ? `GPS ready (±${Math.round(fix.accuracy ?? 0)} m)` : 'Finding GPS position…'}
+            {fix ? `GPS ready (±${fix.accuracy === null ? 'unknown' : Math.round(fix.accuracy)} m)` : 'Finding GPS position…'}
           </AppText>
         </View>
-        {shift!.status === 'scheduled' ? (
-          <AppText variant="label" style={{ color: colors.warning }}>
-            Your shift has not been started. Scans will be marked for review.
-          </AppText>
-        ) : null}
       </View>
 
       {mode === 'camera' ? (

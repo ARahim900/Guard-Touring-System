@@ -9,7 +9,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge, Button, ErrorNote, Field, Select, Spinner, Textarea } from '@/components/ui';
-import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { FLAG_LABELS, VALIDATION, guardName } from '@/lib/labels';
 import { MEDIA_BUCKET, supabase } from '@/lib/supabase';
@@ -18,7 +17,6 @@ import type { Scan, ScanValidation } from '@/lib/types';
 import { unwrap, useAsync } from '@/lib/useAsync';
 
 export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: () => void }) {
-  const { profile } = useAuth();
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [verdict, setVerdict] = useState<ScanValidation>('valid');
   const [reviewNote, setReviewNote] = useState('');
@@ -29,9 +27,9 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
       unwrap(
         await supabase
           .from('scans')
-          .select('*, profiles!scans_guard_id_fkey(full_name), shifts!scans_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name), scan_attachments(*)')
+          .select('id, shift_id, guard_id, checkpoint_id, method, raw_value, status, note, device_time, server_time, clock_offset_sec, effective_time, latitude, longitude, accuracy_m, is_mocked, distance_m, due_at, is_on_time, validation, flags, expected_attachments, review_note, reviewed_at, review_history, profiles!scans_guard_id_fkey(full_name), shifts!scans_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name), scan_attachments(id, type, source, storage_path, size_bytes, duration_sec, captured_at, exif_taken_at, flagged_pre_shift)')
           .eq('id', scanId)
-          .single(),
+          .single().returns<Scan>(),
       ) as Scan,
     [scanId],
   );
@@ -45,7 +43,8 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
     supabase.storage
       .from(MEDIA_BUCKET)
       .createSignedUrls(paths, 3600)
-      .then(({ data }) => {
+      .then(({ data, error: urlError }) => {
+        if (urlError) { toast.error(friendlyError(urlError)); return; }
         const map: Record<string, string> = {};
         data?.forEach((d) => d.path && d.signedUrl && (map[d.path] = d.signedUrl));
         setUrls(map);
@@ -57,7 +56,7 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
     setSaving(true);
     const { error: e } = await supabase
       .from('scans')
-      .update({ validation: verdict, review_note: reviewNote.trim(), reviewed_by: profile!.id, reviewed_at: new Date().toISOString() })
+      .update({ validation: verdict, review_note: reviewNote.trim() })
       .eq('id', scanId);
     setSaving(false);
     if (e) return toast.error(friendlyError(e));
@@ -85,11 +84,11 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
         <Item label="Guard" value={guardName(scan)} />
         <Item label="Checkpoint" value={scan.checkpoints?.name} />
-        <Item label="Scan time (corrected)" value={formatDateTime(scan.effective_time)} />
+        <Item label="Captured scan time" value={formatDateTime(scan.effective_time)} />
         <Item label="Due" value={scan.due_at ? formatDateTime(scan.due_at) : '–'} />
         <Item label="Phone clock at scan" value={formatDateTime(scan.device_time)} />
         <Item label="Received by server" value={formatDateTime(scan.server_time)} />
-        <Item label="Phone clock error" value={`${scan.clock_offset_sec} s`} />
+        <Item label="Clock difference at upload" value={`${scan.clock_offset_sec} s`} />
         <Item label="Distance from checkpoint" value={scan.distance_m !== null ? `${scan.distance_m} m` : 'No GPS'} />
         <Item label="GPS accuracy" value={scan.accuracy_m !== null ? `±${Math.round(scan.accuracy_m)} m` : '–'} />
         <Item label="Mock location" value={scan.is_mocked ? 'YES (fake GPS app)' : 'No'} />
@@ -155,6 +154,7 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
             <Textarea value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} placeholder="e.g. GPS drift in pump room; CCTV confirms visit." />
           </Field>
         </div>
+        {scan.review_history.length > 0 ? <ul className="my-3 space-y-2 text-sm">{scan.review_history.map((review, index) => <li key={`${review.reviewed_at}:${index}`}>{formatDateTime(review.reviewed_at)} · {review.previous_verdict} → {review.verdict}: {review.reason}</li>)}</ul> : null}
         <div className="mt-2 flex justify-end">
           <Button size="sm" loading={saving} onClick={() => void saveReview()}>Save review</Button>
         </div>

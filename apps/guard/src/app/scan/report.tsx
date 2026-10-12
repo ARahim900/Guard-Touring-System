@@ -178,7 +178,7 @@ export default function ReportScreen() {
             <AppText variant="body" style={{ flex: 1 }}>
               {!draft.fix
                 ? 'No GPS position. The scan may not be accepted.'
-                : `About ${Math.round(distance!)} m from the checkpoint (GPS ±${Math.round(draft.fix.accuracy ?? 0)} m)`}
+                : `About ${Math.round(distance!)} m from the checkpoint (GPS ±${draft.fix.accuracy === null ? 'unknown' : Math.round(draft.fix.accuracy)} m)`}
             </AppText>
           </View>
           {tooFar ? (

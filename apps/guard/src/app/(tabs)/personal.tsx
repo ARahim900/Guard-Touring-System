@@ -3,31 +3,24 @@
 // =============================================================================
 import * as Application from 'expo-application';
 import { router } from 'expo-router';
-import { FileText, KeyRound, LogOut, PlayCircle, RefreshCw, Save, StopCircle } from 'lucide-react-native';
+import { FileText, KeyRound, LogOut, RefreshCw, Save } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { useSyncState } from '@/components/SyncBanner';
-import { AppText, Badge, Button, Card, Screen, SectionTitle, TextField } from '@/components/ui';
+import { AppText, Button, Card, Screen, SectionTitle, TextField } from '@/components/ui';
 import { useAuth } from '@/context/AuthProvider';
 import { useShift } from '@/context/ShiftProvider';
 import { useToast } from '@/context/ToastProvider';
 import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
-import { colors, fonts, spacing } from '@/lib/theme';
-import { formatDateTime, formatTime } from '@/lib/time';
+import { colors, spacing } from '@/lib/theme';
+import { formatDateTime } from '@/lib/time';
 import { syncNow } from '@/offline/sync';
-
-// Google Play requires this "prominent disclosure" BEFORE asking for
-// background location, in the app's own words.
-const LOCATION_DISCLOSURE =
-  'MB Patrol collects your location while your shift is active, including when the app is closed or not in use, ' +
-  'so supervisors can see patrol progress and reach you after an SOS. Location is never collected outside your shift ' +
-  'and the trail is deleted after 90 days.';
 
 export default function PersonalScreen() {
   const { profile, signOut, refreshProfile } = useAuth();
-  const { shift, startShift, endShift } = useShift();
+  const { shift } = useShift();
   const sync = useSyncState();
   const toast = useToast();
 
@@ -36,20 +29,12 @@ export default function PersonalScreen() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
-  const [shiftBusy, setShiftBusy] = useState(false);
-  // Security shares one login, so the guard types their own name at the start
-  // of every shift. Deliberately NOT prefilled: yesterday's name must never
-  // carry over to today's guard by accident.
-  const [onDutyName, setOnDutyName] = useState('');
-  const [onDutyRef, setOnDutyRef] = useState('');
-  const [nameError, setNameError] = useState<string | null>(null);
-
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
     setPhone(profile?.phone ?? '');
   }, [profile]);
 
-  const waiting = sync.pending.scans + sync.pending.attachments + sync.pending.pings;
+  const waiting = sync.pending.scans + sync.pending.attachments + sync.pending.pings + sync.pending.failed;
 
   async function saveProfile() {
     if (fullName.trim().length < 2) return toast.error('Enter your full name.');
@@ -76,48 +61,6 @@ export default function PersonalScreen() {
     toast.success('Password changed.');
   }
 
-  function confirmStart() {
-    const name = onDutyName.trim().replace(/\s+/g, ' ');
-    if (name.length < 3) {
-      setNameError('Enter your full name before starting the shift.');
-      return;
-    }
-    setNameError(null);
-    Alert.alert('Location while on shift', LOCATION_DISCLOSURE, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Continue',
-        onPress: async () => {
-          setShiftBusy(true);
-          const res = await startShift(name, onDutyRef);
-          setShiftBusy(false);
-          if (res.ok) {
-            setOnDutyName('');
-            setOnDutyRef('');
-            toast.success(res.message);
-          } else toast.error(res.message);
-        },
-      },
-    ]);
-  }
-
-  function confirmEnd() {
-    Alert.alert('End shift?', 'Location sharing will stop. You cannot restart this shift.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'End shift',
-        style: 'destructive',
-        onPress: async () => {
-          setShiftBusy(true);
-          const res = await endShift();
-          setShiftBusy(false);
-          if (res.ok) toast.success(res.message);
-          else toast.error(res.message);
-        },
-      },
-    ]);
-  }
-
   function confirmSignOut() {
     if (shift?.status === 'active') {
       return Alert.alert('Shift in progress', 'End your shift before signing out.');
@@ -140,64 +83,9 @@ export default function PersonalScreen() {
 
   return (
     <Screen>
-      <AppText variant="heading">Personal</AppText>
-
-      {/* ------------------------------------------------------------ Shift */}
-      <SectionTitle>Shift</SectionTitle>
-      <Card>
-        {!shift ? (
-          <AppText variant="body">No shift assigned right now.</AppText>
-        ) : (
-          <>
-            <View style={styles.rowBetween}>
-              <AppText variant="body" style={{ fontFamily: fonts.semibold, flex: 1 }}>
-                {shift.routes?.name}
-              </AppText>
-              <Badge
-                label={shift.status === 'active' ? 'On shift' : shift.status === 'scheduled' ? 'Not started' : shift.status}
-                tone={shift.status === 'active' ? 'success' : 'info'}
-              />
-            </View>
-            <AppText variant="body">
-              Scheduled {formatDateTime(shift.scheduled_start)} – {formatTime(shift.scheduled_end)}
-            </AppText>
-            {shift.actual_start ? <AppText variant="caption">Started at {formatTime(shift.actual_start)}</AppText> : null}
-            {shift.on_duty_name ? (
-              <Info label="Guard on duty" value={shift.on_duty_ref ? `${shift.on_duty_name} (${shift.on_duty_ref})` : shift.on_duty_name} />
-            ) : null}
-            {shift.status === 'scheduled' ? (
-              <>
-                <TextField
-                  label="Your full name (required)"
-                  value={onDutyName}
-                  onChangeText={(t) => {
-                    setOnDutyName(t);
-                    if (nameError) setNameError(null);
-                  }}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  maxLength={100}
-                  placeholder="e.g. Ahmed Al Hinai"
-                  error={nameError}
-                  hint="Recorded on every scan, alarm and report for today’s patrol. It cannot be changed after you start."
-                />
-                <TextField
-                  label="Employee / ID number (optional)"
-                  value={onDutyRef}
-                  onChangeText={setOnDutyRef}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  maxLength={50}
-                />
-                <Button title="Start shift" icon={PlayCircle} onPress={confirmStart} loading={shiftBusy} />
-              </>
-            ) : null}
-            {shift.status === 'active' ? (
-              <Button title="End shift" icon={StopCircle} variant="danger" onPress={confirmEnd} loading={shiftBusy} />
-            ) : null}
-          </>
-        )}
-      </Card>
+      <AppText variant="heading">Account</AppText>
+      <Button title="Back to tonight" variant="ghost" onPress={() => router.navigate('/')} />
+      <Button title="Patrol statistics" variant="ghost" onPress={() => router.navigate('/statistic')} />
 
       {/* ---------------------------------------------------------- Profile */}
       <SectionTitle>Profile</SectionTitle>

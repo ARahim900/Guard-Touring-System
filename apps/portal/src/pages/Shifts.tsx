@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, Spinner, Table, Td, Textarea } from '@/components/ui';
+import { NightShiftHours, type ShiftHours } from '@/components/NightShiftHours';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { SHIFT_STATUS, guardName } from '@/lib/labels';
@@ -29,6 +30,7 @@ interface Form {
 
 export default function ShiftsPage() {
   const { profile } = useAuth();
+  const hours = useAsync(async () => unwrap(await supabase.from('app_settings').select('night_shift_start, night_shift_end').eq('id', 1).single()) as ShiftHours, []);
   const [weekStart, setWeekStart] = useState(dayKey());
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
@@ -42,10 +44,10 @@ export default function ShiftsPage() {
     return unwrap(
       await supabase
         .from('shifts')
-        .select('*, profiles!shifts_guard_id_fkey(full_name), routes(name)')
+        .select('id, guard_id, route_id, scheduled_start, scheduled_end, actual_start, actual_end, auto_closed_at, status, notes, on_duty_name, on_duty_ref, profiles!shifts_guard_id_fkey(full_name), routes(name)')
         .gte('scheduled_start', from)
         .lt('scheduled_start', to)
-        .order('scheduled_start'),
+        .order('scheduled_start').returns<Shift[]>(),
     ) as Shift[];
   }, [weekStart]);
 
@@ -54,7 +56,7 @@ export default function ShiftsPage() {
   async function save() {
     if (!form) return;
     if (!form.guard_id || !form.route_id) return toast.error('Choose a guard and a route.');
-    if (!form.start || !form.end) return toast.error('Set start and end times.');
+    if (!form.date || !form.start || !form.end || form.start === form.end) return toast.error('Set a date and different start and end times.');
     const repeat = Math.min(Math.max(1, form.repeat), 62);
     const rows = Array.from({ length: repeat }, (_, i) => {
       const date = addDays(form.date, i);
@@ -72,13 +74,14 @@ export default function ShiftsPage() {
     });
 
     // Warn about overlaps with existing shifts of the same guard.
-    const { data: clash } = await supabase
+    const { data: clash, error: clashError } = await supabase
       .from('shifts')
       .select('id, scheduled_start, scheduled_end')
       .eq('guard_id', form.guard_id)
       .neq('status', 'cancelled')
       .lt('scheduled_start', rows[rows.length - 1].scheduled_end)
       .gt('scheduled_end', rows[0].scheduled_start);
+    if (clashError) return toast.error(friendlyError(clashError));
     // Two shifts overlap when each starts before the other ends.
     const overlaps = (clash ?? []).filter((c) =>
       rows.some((r) => new Date(c.scheduled_start) < new Date(r.scheduled_end) && new Date(c.scheduled_end) > new Date(r.scheduled_start)),
@@ -116,11 +119,13 @@ export default function ShiftsPage() {
         title="Schedules"
         subtitle="Shifts for the week. Times are Muscat time."
         actions={
-          <Button icon={Plus} onClick={() => setForm({ guard_id: '', route_id: '', date: weekStart, start: '22:00', end: '06:00', repeat: 1, notes: '' })}>
+          <Button icon={Plus} onClick={() => setForm({ guard_id: '', route_id: '', date: weekStart, start: hours.data?.night_shift_start?.slice(0, 5) ?? '', end: hours.data?.night_shift_end?.slice(0, 5) ?? '', repeat: 1, notes: '' })}>
             New shift
           </Button>
         }
       />
+      <NightShiftHours hours={hours.data} loading={hours.loading} error={hours.error} onSaved={hours.setData} />
+      <ErrorNote message={guards.error ?? routes.error} />
       <Card>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><ChevronLeft className="size-4" /></Button>
@@ -154,7 +159,7 @@ export default function ShiftsPage() {
                           ) : null}
                         </Td>
                         <Td>{s.routes?.name}</Td>
-                        <Td><Badge {...SHIFT_STATUS[s.status]} /></Td>
+                        <Td><Badge {...(s.auto_closed_at ? { label: 'Auto-closed; finish unconfirmed', tone: 'neutral' as const } : SHIFT_STATUS[s.status])} /></Td>
                         <Td className="text-xs text-muted-foreground">
                           {s.actual_start ? formatTime(s.actual_start) : '–'} / {s.actual_end ? formatTime(s.actual_end) : '–'}
                           {s.notes ? <span className="block">{s.notes}</span> : null}
@@ -204,7 +209,7 @@ export default function ShiftsPage() {
                 {routes.data?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </Select>
             </Field>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Field label="First date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
               <Field label="Start"><Input type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></Field>
               <Field label="End" hint={form.end <= form.start ? 'Ends next day' : undefined}><Input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></Field>

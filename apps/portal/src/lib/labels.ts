@@ -20,15 +20,15 @@ export const FLAG_LABELS: Record<string, string> = {
 };
 
 export const VALIDATION: Record<ScanValidation, { label: string; tone: Tone }> = {
-  valid: { label: 'Valid', tone: 'success' },
-  flagged: { label: 'Flagged', tone: 'warning' },
+  valid: { label: 'Verified', tone: 'success' },
+  flagged: { label: 'Awaiting review', tone: 'warning' },
   rejected: { label: 'Rejected', tone: 'danger' },
 };
 
 export const SHIFT_STATUS: Record<ShiftStatus, { label: string; tone: Tone }> = {
   scheduled: { label: 'Scheduled', tone: 'info' },
   active: { label: 'On shift', tone: 'success' },
-  completed: { label: 'Completed', tone: 'neutral' },
+  completed: { label: 'Closed', tone: 'neutral' },
   missed: { label: 'Missed', tone: 'danger' },
   cancelled: { label: 'Cancelled', tone: 'neutral' },
 };

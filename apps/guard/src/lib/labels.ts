@@ -20,8 +20,8 @@ export const FLAG_LABELS: Record<string, string> = {
 export const flagText = (flags: string[]) => flags.map((f) => FLAG_LABELS[f] ?? f).join(' · ');
 
 export const VALIDATION_LABEL: Record<ScanValidation, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
-  valid: { label: 'Accepted', tone: 'success' },
-  flagged: { label: 'Accepted · review', tone: 'warning' },
+  valid: { label: 'Verified', tone: 'success' },
+  flagged: { label: 'Awaiting review', tone: 'warning' },
   rejected: { label: 'Not accepted', tone: 'danger' },
 };
 

@@ -14,7 +14,7 @@ import { reportError } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import type { Shift, ShiftCheckpoint } from '@/lib/types';
 import { readCache, writeCache } from '@/offline/cache';
-import { localScanCheckpoints } from '@/offline/outbox';
+import { localScanCheckpoints, pendingCounts } from '@/offline/outbox';
 import { subscribeSync, syncNow } from '@/offline/sync';
 import { isTracking, startTracking, stopTracking } from '@/services/location';
 import { useAuth } from './AuthProvider';
@@ -51,12 +51,12 @@ interface Snapshot {
 async function fetchSnapshot(guardId: string): Promise<Snapshot> {
   const { data: shifts, error } = await supabase
     .from('shifts')
-    .select('*, routes(name)')
+    .select('id, guard_id, route_id, scheduled_start, scheduled_end, actual_start, actual_end, auto_closed_at, status, notes, on_duty_name, on_duty_ref, routes(name)')
     .eq('guard_id', guardId)
     .in('status', ['active', 'scheduled'])
     .gte('scheduled_end', new Date(Date.now() - 2 * 3600 * 1000).toISOString())
     .order('scheduled_start', { ascending: true })
-    .limit(5);
+    .limit(5).returns<Shift[]>();
   if (error) throw error;
 
   const list = (shifts ?? []) as Shift[];
@@ -65,7 +65,7 @@ async function fetchSnapshot(guardId: string): Promise<Snapshot> {
 
   const { data: cps, error: cpError } = await supabase
     .from('shift_checkpoint_status')
-    .select('*')
+    .select('shift_id, checkpoint_id, sequence, due_offset_min, due_at, checkpoint_name, code, nfc_uid, latitude, longitude, radius_m, scan_id, scanned_at, scan_status, validation, is_on_time, completed')
     .eq('shift_id', shift.id)
     .order('sequence', { ascending: true });
   if (cpError) throw cpError;
@@ -198,12 +198,16 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     const shift = snapshot.shift;
     if (!shift) return { ok: false, message: 'No active shift.' };
     await syncNow().catch(() => undefined); // push the last GPS points first
+    const pending = guardId ? await pendingCounts(guardId) : null;
+    if (!pending || pending.scans > 0 || pending.attachments > 0 || pending.failed > 0) {
+      return { ok: false, message: 'Some records have not uploaded. Reconnect and check History before finishing.' };
+    }
     const { error: rpcError } = await supabase.rpc('end_shift', { p_shift_id: shift.id });
     if (rpcError) return { ok: false, message: friendlyError(rpcError) };
-    await stopTracking().catch(() => undefined);
+    await stopTracking().catch((e) => reportError(e, { where: 'stopTracking' }));
     await load();
     return { ok: true, message: 'Shift ended. Thank you.' };
-  }, [snapshot.shift, load]);
+  }, [snapshot.shift, load, guardId]);
 
   const reloadLocal = useCallback(() => refreshLocal(snapshot.shift?.id), [refreshLocal, snapshot.shift?.id]);
 

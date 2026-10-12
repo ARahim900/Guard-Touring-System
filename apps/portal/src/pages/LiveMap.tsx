@@ -2,13 +2,13 @@
 import { Phone, RefreshCw } from 'lucide-react';
 
 import { BaseMap, CheckpointLayer, FitBounds, GuardLayer, SosLayer } from '@/components/PatrolMap';
-import { Badge, Button, Card, PageHeader } from '@/components/ui';
+import { Badge, Button, Card, ErrorNote, PageHeader } from '@/components/ui';
 import { guardName } from '@/lib/labels';
 import { formatTime, relative } from '@/lib/time';
 import { useLiveData } from '@/lib/useLiveData';
 
 export default function LiveMapPage() {
-  const { positions, alarms, checkpoints, updatedAt, reload } = useLiveData();
+  const { positions, alarms, checkpoints, error, updatedAt, reload } = useLiveData();
   // Fit to the checkpoints only: guard positions change every few seconds and
   // would keep re-zooming the map while a supervisor is looking at an SOS.
   const points: [number, number][] = checkpoints.map((c) => [c.latitude, c.longitude]);
@@ -17,9 +17,10 @@ export default function LiveMapPage() {
     <>
       <PageHeader
         title="Live map"
-        subtitle={updatedAt ? `Updated ${formatTime(updatedAt)} · refreshes automatically` : 'Loading…'}
+        subtitle={updatedAt ? `Last successful update ${formatTime(updatedAt)} · refreshes automatically` : 'Loading…'}
         actions={<Button variant="outline" icon={RefreshCw} onClick={() => void reload()}>Refresh</Button>}
       />
+      <ErrorNote message={error} />
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <Card className="overflow-hidden">
           <div className="-m-5">

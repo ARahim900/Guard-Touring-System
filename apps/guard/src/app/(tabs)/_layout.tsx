@@ -6,7 +6,7 @@
 // =============================================================================
 import { router } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
-import { BarChart3, ClipboardList, History, Plus, UserRound } from 'lucide-react-native';
+import { ClipboardList, History, Plus } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { colors, fonts, shadow } from '@/lib/theme';
@@ -39,11 +39,11 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Work', tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} /> }}
+        options={{ title: 'Tonight', tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} /> }}
       />
       <Tabs.Screen
         name="statistic"
-        options={{ title: 'Statistic', tabBarIcon: ({ color }) => <BarChart3 size={24} color={color} /> }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="new-scan"
@@ -52,11 +52,11 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="histories"
-        options={{ title: 'Histories', tabBarIcon: ({ color }) => <History size={24} color={color} /> }}
+        options={{ title: 'History', tabBarIcon: ({ color }) => <History size={24} color={color} /> }}
       />
       <Tabs.Screen
         name="personal"
-        options={{ title: 'Personal', tabBarIcon: ({ color }) => <UserRound size={24} color={color} /> }}
+        options={{ href: null }}
       />
     </Tabs>
   );

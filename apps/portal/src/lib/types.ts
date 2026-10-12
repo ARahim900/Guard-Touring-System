@@ -65,6 +65,7 @@ export interface Shift {
   scheduled_end: string;
   actual_start: string | null;
   actual_end: string | null;
+  auto_closed_at: string | null;
   status: ShiftStatus;
   notes: string | null;
   /** Name typed by the guard at Start shift (security shares one login). */
@@ -106,6 +107,7 @@ export interface Scan {
   expected_attachments: number;
   review_note: string | null;
   reviewed_at: string | null;
+  review_history: { previous_verdict: ScanValidation; verdict: ScanValidation; reason: string; reviewed_at: string; reviewed_by: string }[];
   profiles?: { full_name: string } | null;
   shifts?: OnDuty | null;
   checkpoints?: { name: string } | null;
@@ -172,39 +174,4 @@ export interface LivePosition {
   accuracy_m: number | null;
   is_mocked: boolean;
   recorded_at: string;
-}
-
-export interface ReportRow {
-  guard_id: string;
-  full_name: string;
-  employee_no: string | null;
-  shifts: number;
-  shifts_missed: number;
-  expected: number;
-  completed: number;
-  on_time: number;
-  completion_rate: number | null;
-  punctuality_rate: number | null;
-  incidents: number;
-  sos: number;
-  rejected_scans: number;
-}
-
-/** One row of daily_patrol_log: one shift (normally one per day). */
-export interface DailyLogRow {
-  shift_id: string;
-  patrol_date: string; // YYYY-MM-DD, Muscat time
-  on_duty_name: string;
-  on_duty_ref: string | null;
-  login_name: string;
-  route_name: string;
-  status: ShiftStatus;
-  scheduled_start: string;
-  actual_start: string | null;
-  actual_end: string | null;
-  checkpoints_total: number;
-  visited: number;
-  on_time: number;
-  incidents: number;
-  sos: number;
 }
