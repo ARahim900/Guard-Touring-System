@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Button, Card, EmptyState, Field, Input, PageHeader, Select, StatCard, Table, Td } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
-import { buildReportPdf, monthLabel, totals } from '@/lib/reportPdf';
+import { buildReportPdf, loadLogo, monthLabel, totals } from '@/lib/reportPdf';
 import { supabase } from '@/lib/supabase';
 import { dayKey } from '@/lib/time';
 import type { Contractor, Incident, ReportRow } from '@/lib/types';
@@ -53,7 +53,7 @@ export default function ReportsPage() {
     }
   }
 
-  function download() {
+  async function download() {
     if (!rows) return;
     const contractor = contractors.data?.find((c) => c.id === contractorId);
     const doc = buildReportPdf({
@@ -62,6 +62,7 @@ export default function ReportsPage() {
       rows,
       incidents,
       generatedBy: profile?.full_name ?? 'supervisor',
+      logoDataUrl: await loadLogo(),
     });
     const safe = (contractor?.name ?? 'contractor').replace(/[^a-z0-9]+/gi, '_');
     doc.save(`MB_Patrol_Report_${safe}_${month}.pdf`);
@@ -85,7 +86,7 @@ export default function ReportsPage() {
             <Input type="month" value={month} max={dayKey().slice(0, 7)} onChange={(e) => { setMonth(e.target.value); setRows(null); }} />
           </Field>
           <Button icon={Play} loading={busy} onClick={() => void run()}>Run report</Button>
-          <Button variant="secondary" icon={FileDown} disabled={!rows} onClick={download}>Download PDF</Button>
+          <Button variant="secondary" icon={FileDown} disabled={!rows} onClick={() => void download()}>Download PDF</Button>
         </div>
       </Card>
 

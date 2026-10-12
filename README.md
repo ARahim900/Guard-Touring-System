@@ -21,6 +21,7 @@ A security patrol system for Muscat Bay, built in one release. It has three part
 Patrolling_Tour_System/
 ├── README.md                     ← you are here
 ├── docs/                         ← installation, design, store checklist, privacy policy
+├── brand/                        ← official logo + script that generates every icon from it
 ├── supabase/
 │   ├── migrations/               ← the database, applied in order
 │   │   ├── …0100_core_schema.sql              tables

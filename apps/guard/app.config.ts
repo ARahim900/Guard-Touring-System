@@ -61,7 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     versionCode: 1,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#4E4456',
+      backgroundColor: '#FFFFFF',
     },
     permissions: [
       'android.permission.CAMERA',
@@ -87,7 +87,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-font',
     [
       'expo-splash-screen',
-      { image: './assets/splash-icon.png', imageWidth: 120, backgroundColor: '#4E4456' },
+      { image: './assets/splash-icon.png', imageWidth: 220, backgroundColor: '#FFFFFF' },
     ],
     [
       'expo-camera',

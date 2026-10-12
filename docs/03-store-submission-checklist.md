@@ -3,7 +3,8 @@
 Tick every line before submitting. Items already handled in the code are marked ✅. Items you must do are marked ☐.
 
 ## 3.1 Before either store
-- ☐ Replace the placeholder icon (`apps/guard/assets/icon.png`, `adaptive-icon.png`, `splash-icon.png`) with the official Muscat Bay artwork. 1024×1024 PNG, no transparency for the iOS icon.
+- ✅ App icon, Android adaptive icon and splash screen are made from the official Muscat Bay logo (`brand/generate_assets.py`).
+- ☐ Ask Marketing for the **vector** logo (SVG, AI or PDF). The supplied PNG is 400 px, so the Arabic and English wordmark on the splash screen is slightly soft; the icon itself is redrawn and sharp. Replace `brand/muscat_bay.png` with a ≥1600 px export and run `python3 brand/generate_assets.py`.
 - ☐ Complete every **[square bracket]** in the privacy policy, in all three places:
   - `docs/privacy-policy.md`
   - `apps/guard/src/app/privacy.tsx`

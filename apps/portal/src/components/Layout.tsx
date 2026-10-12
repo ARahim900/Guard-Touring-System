@@ -15,7 +15,6 @@ import {
   Menu,
   Route as RouteIcon,
   ShieldAlert,
-  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -46,7 +45,10 @@ export function Layout() {
   const sidebar = (
     <nav className="flex h-full w-[220px] flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-2 border-b border-white/10 px-4">
-        <ShieldCheck className="size-7 text-secondary" />
+        {/* The logo is purple, so it sits on a white tile to stay visible on the purple sidebar. */}
+        <span className="flex size-9 items-center justify-center rounded-md bg-white p-1">
+          <img src="/muscat-bay-mark.png" alt="Muscat Bay" className="size-full" />
+        </span>
         <div className="leading-tight">
           <p className="font-bold text-white">MB Patrol</p>
           <p className="text-xs text-sidebar-foreground/80">Supervisor portal</p>

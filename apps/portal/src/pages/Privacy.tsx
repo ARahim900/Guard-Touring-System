@@ -1,8 +1,6 @@
 // Public privacy policy page (no login). The app stores require a public URL:
 // use https://<your-portal>.netlify.app/privacy.
 // Keep identical to the in-app screen (apps/guard/src/app/privacy.tsx).
-import { ShieldCheck } from 'lucide-react';
-
 const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Who we are',
@@ -51,7 +49,9 @@ export default function PrivacyPage() {
     <div className="min-h-full bg-background">
       <header className="bg-primary px-6 py-6 text-white">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
-          <ShieldCheck className="size-8 text-secondary" />
+          <span className="flex size-11 items-center justify-center rounded-md bg-white p-1.5">
+            <img src="/muscat-bay-mark.png" alt="Muscat Bay" className="size-full" />
+          </span>
           <div>
             <p className="text-lg font-bold">MB Patrol</p>
             <p className="text-sm opacity-80">Privacy policy</p>

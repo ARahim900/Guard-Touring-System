@@ -1,5 +1,4 @@
 // Supervisor sign-in. Accounts are created by an admin (Guards & users page).
-import { ShieldCheck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -32,9 +31,7 @@ export default function LoginPage() {
     <div className="flex min-h-full items-center justify-center bg-primary p-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg bg-card p-6 shadow-card">
         <div className="flex flex-col items-center gap-2 text-center">
-          <div className="flex size-14 items-center justify-center rounded-lg bg-primary">
-            <ShieldCheck className="size-8 text-secondary" />
-          </div>
+          <img src="/muscat-bay-logo.png" alt="Muscat Bay" className="h-24 w-auto" />
           <h1 className="text-xl">MB Patrol</h1>
           <p className="text-sm text-muted-foreground">Supervisor portal · Muscat Bay</p>
         </div>

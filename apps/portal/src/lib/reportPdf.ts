@@ -21,6 +21,8 @@ export interface ReportInput {
   rows: ReportRow[];
   incidents: Incident[];
   generatedBy: string;
+  /** Muscat Bay mark as a PNG data URL (see loadLogo). Optional. */
+  logoDataUrl?: string | null;
 }
 
 export function totals(rows: ReportRow[]) {
@@ -62,6 +64,12 @@ export function buildReportPdf(input: ReportInput): jsPDF {
   doc.text(`${input.contractorName}  ·  ${input.monthLabel}`, 14, 20);
   doc.setFillColor(...TEAL);
   doc.rect(0, 26, W, 1.5, 'F');
+  if (input.logoDataUrl) {
+    // The logo is purple, so it sits on a white tile inside the purple band.
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(W - 34, 3, 20, 20, 2, 2, 'F');
+    doc.addImage(input.logoDataUrl, 'PNG', W - 32, 5, 16, 16);
+  }
 
   // ---- KPI boxes
   const kpis: [string, string][] = [
@@ -166,3 +174,18 @@ export function buildReportPdf(input: ReportInput): jsPDF {
 export const monthLabel = (month: string) =>
   new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'Asia/Muscat' }).format(new Date(`${month}-15T12:00:00+04:00`));
 
+
+/** Read the Muscat Bay mark from the portal's public folder as a data URL. */
+export async function loadLogo(): Promise<string | null> {
+  try {
+    const blob = await (await fetch('/muscat-bay-mark.png')).blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null; // the report still works without the logo
+  }
+}

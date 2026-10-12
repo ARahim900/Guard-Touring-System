@@ -1,6 +1,6 @@
 // Login screen. No "Sign up": accounts are created by supervisors.
+import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
@@ -34,9 +34,12 @@ export default function LoginScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen edges={['top', 'bottom']} contentStyle={{ flexGrow: 1, justifyContent: 'center' }}>
         <View style={styles.brand}>
-          <View style={styles.logo}>
-            <ShieldCheck size={40} color={colors.secondary} />
-          </View>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            contentFit="contain"
+            accessibilityLabel="Muscat Bay"
+          />
           <AppText variant="heading">MB Patrol</AppText>
           <AppText variant="body" style={{ color: colors.textMuted }}>
             Muscat Bay security patrols
@@ -88,14 +91,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   brand: { alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
-  logo: {
-    width: 76,
-    height: 76,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
+  // logo.png is 800 x 480 px; keep that 5:3 shape.
+  logo: { width: 220, height: 132, marginBottom: spacing.sm },
   link: { alignSelf: 'center', padding: spacing.md },
 });

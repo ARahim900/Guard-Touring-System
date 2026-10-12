@@ -10,3 +10,4 @@ node_modules/
 # Supabase CLI local state
 supabase/.branches
 supabase/.temp
+__pycache__/
