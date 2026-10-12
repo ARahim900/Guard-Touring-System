@@ -41,9 +41,9 @@ Install **Visual Studio Code** (https://code.visualstudio.com). Open the `Patrol
 > - **Database:** all 13 tables, the security rules, the private storage bucket, realtime, the reports and the live-map view are installed. Migrations 06 (guard on duty, for the shared login) and 07 (daily patrol log) are installed too.
 > - **Edge Function:** `admin-users` is deployed.
 >
-> **Still to do:**
-> - Step 2.1: turn off public sign-up.
-> - Steps 2.4 (first admin) and 2.6 (rotate the key).
+> **Also done:** step 2.1 (public sign-up is off) and step 2.6 (leaked key revoked).
+>
+> **Still to do:** step 2.4 (first admin).
 
 Your project reference is **`zdezuylsruzbddqcdhog`**. Its URL is `https://zdezuylsruzbddqcdhog.supabase.co`.
 
@@ -106,8 +106,11 @@ The fix is to move to Supabase's new key pair and switch the legacy keys off:
 
 1. Put the **publishable** key in both `.env` files and the Netlify and EAS variables. The variable names stay the same.
 2. Deploy the Edge Function as in step 2.3.
-3. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This kills the leaked `service_role` key. It can be re-enabled if something was missed.
-4. Create a test account from the portal (step 3.3). This confirms the Edge Function still works.
+3. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This stops the legacy keys working in the `apikey` header.
+4. Dashboard → **Project Settings** → **JWT Keys** → **Previously used keys** → **Legacy HS256 (Shared Secret)** → **Revoke key**. Step 3 alone is not enough: the legacy keys stay valid as login tokens (`Authorization: Bearer`) until the secret that signed them is revoked.
+5. Create a test account from the portal (step 3.3). This confirms the Edge Function still works.
+
+> **Status on 12 Oct 2026:** steps 2–4 are done on `zdezuylsruzbddqcdhog`. Tested: the legacy keys are rejected in both the `apikey` and `Authorization` headers; the publishable key and the Edge Function work.
 
 ---
 
