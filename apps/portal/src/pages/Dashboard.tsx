@@ -58,7 +58,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle={`Today · ${formatDay(new Date())}`} />
+      <PageHeader title="Overview" subtitle={`Today · ${formatDay(new Date())}`} />
       <div className="mb-6 grid gap-[14px] sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Users} label="Guards on shift" value={`${active} / ${shifts.length}`} hint="active / scheduled today" />
         <StatCard icon={CheckCircle2} tone="success" label="Checkpoints done (due so far)" value={pct === null ? '–' : `${pct}%`} hint={`${done} of ${due.length}`} />
