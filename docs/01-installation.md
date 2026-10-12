@@ -82,9 +82,11 @@ Check it worked:
 ### 2.3 Deploy the Edge Function (account management)
 Why: creating a login needs the `service_role` key. That key must stay on Supabase's servers, so the portal asks this function to create accounts instead.
 ```bash
-npx supabase functions deploy admin-users --project-ref zdezuylsruzbddqcdhog
+npx supabase functions deploy admin-users --project-ref zdezuylsruzbddqcdhog --no-verify-jwt
 ```
-You do not need to set any secret. Supabase gives every function its own `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
+You do not need to set any secret. Supabase gives every function its own `SUPABASE_URL` and `SUPABASE_SECRET_KEYS` (the new `sb_secret_...` key) automatically.
+
+Why `--no-verify-jwt`: Supabase's built-in "Verify JWT" check only understands the legacy keys, which are switched off (step 2.6). The function checks the caller's login itself, so it stays protected. **Always deploy with this flag**, or account creation will fail.
 
 ### 2.4 Make yourself the first admin
 1. Dashboard → **Authentication** → **Users** → **Add user** → **Create new user**. Enter your email and a strong password, and tick **Auto Confirm User**.
@@ -93,11 +95,11 @@ You do not need to set any secret. Supabase gives every function its own `SUPABA
 ### 2.5 Check the security advisors
 Dashboard → **Advisors** → **Security Advisor**. It should show no "RLS disabled" errors.
 
-### 2.6 Rotate the leaked `service_role` key
-The `service_role` key was pasted into a chat while this system was being built. Treat it as compromised: anyone holding it can read and delete all data.
-- Dashboard → **Project Settings** → **API Keys**. Follow Supabase's current procedure to rotate or replace the secret (`service_role`) key, and disable the old one.
-- After rotating, run step 2.3 again and create a test account from the portal (step 3.3). This confirms the Edge Function still works.
-- If the `anon` key changes too, update both `.env` files and the Netlify and EAS variables.
+### 2.6 Switch off the leaked legacy keys
+The legacy `service_role` key was pasted into a chat while this system was being built. Treat it as compromised: anyone holding it can read and delete all data.
+1. The apps use the **new keys** instead: the publishable key (`sb_publishable_...`) in the portal, guard app, Netlify and EAS, and the secret key (`sb_secret_...`) inside the Edge Function only.
+2. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This switches off both legacy keys (`anon` and `service_role`). You can switch them back on from the same page if something breaks.
+3. Check straight away: sign in to the portal, open the Dashboard, and create a test guard account (step 3.3). If all three work, you are done.
 
 ---
 
@@ -109,7 +111,7 @@ cd apps/portal
 npm ci                         # installs the exact package versions in package-lock.json
 cp .env.example .env.local     # Windows PowerShell: Copy-Item .env.example .env.local
 ```
-Open `.env.local` and paste the **anon public** key after `VITE_SUPABASE_ANON_KEY=`. Find it under Dashboard → Project Settings → API. **Never paste the service_role key here.**
+Open `.env.local` and paste the **publishable** key (`sb_publishable_...`) after `VITE_SUPABASE_ANON_KEY=`. Find it under Dashboard → Project Settings → API Keys. **Never paste a secret key here.**
 ```bash
 npm run dev                    # open http://localhost:5173 and sign in as the admin
 ```
@@ -158,7 +160,7 @@ eas init                        # creates the Expo project and prints its ID
 `.env` stays on your computer, so EAS needs its own copy of the public values. Run this once per environment (`development`, `preview`, `production`):
 ```bash
 eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_URL --value https://zdezuylsruzbddqcdhog.supabase.co --visibility plaintext
-eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <anon key> --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <publishable key sb_publishable_...> --visibility plaintext
 eas env:create --environment development --name EXPO_PUBLIC_CONTROL_ROOM_PHONE --value +96824857781 --visibility plaintext
 # Optional crash reporting:
 eas env:create --environment development --name EXPO_PUBLIC_SENTRY_DSN --value <dsn> --visibility plaintext

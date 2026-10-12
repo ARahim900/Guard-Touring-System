@@ -9,6 +9,12 @@
 // which runs on Supabase's servers where the key is held as a secret
 // environment variable, and the function checks WHO is asking first.
 //
+// Keys: this uses the new secret key (sb_secret_...), which Supabase injects
+// as SUPABASE_SECRET_KEYS. The legacy service_role key leaked during the
+// build, so the legacy keys are switched off. Because the platform's built-in
+// "Verify JWT" only understands legacy keys, deploy with --no-verify-jwt; the
+// caller's login is checked in step 1 below instead.
+//
 // Actions (POST JSON body):
 //   { action: 'create', email, password, full_name, role?, contractor_id?, employee_no?, phone? }
 //   { action: 'set_password', user_id, password }
@@ -24,10 +30,11 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 type Role = 'guard' | 'supervisor' | 'admin';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SECRET_KEY: string = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')['default'];
+if (!SECRET_KEY) throw new Error('SUPABASE_SECRET_KEYS has no "default" secret key.');
 
 // Admin client: full access. Only used AFTER the caller has been checked.
-const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+const admin = createClient(SUPABASE_URL, SECRET_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
