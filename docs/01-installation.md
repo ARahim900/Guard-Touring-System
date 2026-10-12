@@ -86,6 +86,8 @@ npx supabase functions deploy admin-users --project-ref zdezuylsruzbddqcdhog --n
 ```
 You do not need to set any secret. Supabase gives every function its own `SUPABASE_URL` and `SUPABASE_SECRET_KEYS` automatically.
 
+Before deploying, check **Project Settings → API Keys → Publishable and secret API keys** shows a publishable key and a secret key named `default`. Older projects must press **Create new API keys** first; without them `SUPABASE_SECRET_KEYS` does not exist and the function fails at start-up.
+
 `--no-verify-jwt` is required: the platform's built-in JWT check only understands the legacy keys, which are switched off (step 2.6). The function checks the caller's login itself.
 
 ### 2.4 Make yourself the first admin
@@ -105,12 +107,13 @@ The fix is to move to Supabase's new key pair and switch the legacy keys off:
 | `service_role` | Secret key `sb_secret_…` | `admin-users` Edge Function only (read from `SUPABASE_SECRET_KEYS`) |
 
 1. Put the **publishable** key in both `.env` files and the Netlify and EAS variables. The variable names stay the same.
-2. Deploy the Edge Function as in step 2.3.
-3. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This stops the legacy keys working in the `apikey` header.
-4. Dashboard → **Project Settings** → **JWT Keys** → **Previously used keys** → **Legacy HS256 (Shared Secret)** → **Revoke key**. Step 3 alone is not enough: the legacy keys stay valid as login tokens (`Authorization: Bearer`) until the secret that signed them is revoked.
-5. Create a test account from the portal (step 3.3). This confirms the Edge Function still works.
+2. Redeploy the portal and ship a new guard app build. The keys are compiled into the apps, so changing a variable does not update a copy already deployed or installed. Check **API Keys → Legacy** shows the legacy keys are no longer being used.
+3. Deploy the Edge Function as in step 2.3.
+4. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This stops the legacy keys working in the `apikey` header.
+5. Dashboard → **Project Settings** → **JWT Keys** → **Previously used keys** → **Legacy HS256 (Shared Secret)** → **Revoke key**. Step 4 alone is not enough: the legacy keys stay valid as login tokens (`Authorization: Bearer`) until the secret that signed them is revoked.
+6. Create a test account from the portal (step 3.3). This confirms the Edge Function still works.
 
-> **Status on 12 Oct 2026:** steps 2–4 are done on `zdezuylsruzbddqcdhog`. Tested: the legacy keys are rejected in both the `apikey` and `Authorization` headers; the publishable key and the Edge Function work.
+> **Status on 12 Oct 2026:** steps 3–5 are done on `zdezuylsruzbddqcdhog` (no client had been deployed yet, so step 2 did not apply). Tested: the legacy keys are rejected in both the `apikey` and `Authorization` headers; the publishable key and the Edge Function work.
 
 ---
 
