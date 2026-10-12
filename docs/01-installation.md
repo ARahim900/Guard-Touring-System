@@ -38,12 +38,11 @@ Install **Visual Studio Code** (https://code.visualstudio.com). Open the `Patrol
 ## Part 2: Backend (Supabase)
 
 > **Status on 12 Oct 2026:** steps 2.2 and 2.3 are already done on project `zdezuylsruzbddqcdhog`, installed through the Claude connector and checked against the tested local copy.
-> - **Database:** all 13 tables, the security rules, the private storage bucket, realtime, the reports and the live-map view are installed.
+> - **Database:** all 13 tables, the security rules, the private storage bucket, realtime, the reports and the live-map view are installed. Migrations 06 (guard on duty, for the shared login) and 07 (daily patrol log) are installed too.
 > - **Edge Function:** `admin-users` is deployed.
 >
 > **Still to do:**
 > - Step 2.1: turn off public sign-up.
-> - Run `supabase/finish_in_sql_editor.sql` once in the SQL Editor. It adds the 5-minute monitor.
 > - Steps 2.4 (first admin) and 2.6 (rotate the key).
 
 Your project reference is **`zdezuylsruzbddqcdhog`**. Its URL is `https://zdezuylsruzbddqcdhog.supabase.co`.
@@ -54,7 +53,7 @@ Why: accounts are created only by supervisors. Nobody should be able to register
 Supabase Dashboard → **Authentication** → **Sign In / Providers** → switch **off** "Allow new users to sign up". Keep **Email** enabled as a provider.
 
 ### 2.2 Create the database (migrations)
-A "migration" is a SQL file that changes the database. The five files in `supabase/migrations/` build everything, and they must run **in order**.
+A "migration" is a SQL file that changes the database. The seven files in `supabase/migrations/` build everything, and they must run **in order**.
 
 **Option A: Supabase CLI (recommended, repeatable)**
 ```bash
@@ -62,7 +61,7 @@ A "migration" is a SQL file that changes the database. The five files in `supaba
 npx supabase login                                   # opens the browser once
 npx supabase init                                    # creates supabase/config.toml; answer "N" to the editor questions
 npx supabase link --project-ref zdezuylsruzbddqcdhog # asks for your DATABASE password (Dashboard → Project Settings → Database)
-npx supabase db push                                 # applies the 5 migrations in order
+npx supabase db push                                 # applies the 7 migrations in order
 ```
 
 **Option B: SQL Editor (no command line)**
@@ -72,6 +71,8 @@ Dashboard → **SQL Editor** → **New query**. Paste the whole content of each 
 3. `20261012000300_patrol_functions.sql`
 4. `20261012000400_storage.sql`
 5. `20261012000500_monitoring_reports_realtime.sql`
+6. `20261012000600_guard_on_duty.sql`
+7. `20261012000700_daily_patrol_log.sql`
 
 Check it worked:
 - **Table Editor**: 13 tables. Each one shows **RLS enabled**.
@@ -125,7 +126,7 @@ The public privacy policy is then at `https://<your-site>/privacy`. The app stor
 
 ### 3.3 First data (in the portal, in this order)
 1. **Contractors**: add each security company.
-2. **Guards & users**: create guard logins. The portal suggests a temporary password. Share it in person.
+2. **Guards & users**: create the **one shared security login** (e.g. security@muscatbay.com, role Guard, linked to the contractor). The portal suggests a temporary password. Share it in person with the security team leader only. Each guard types their own name at Start shift.
 3. **Checkpoints**: create them on site (see Part 5).
 4. **Routes**: put checkpoints in order and set "due at shift start + N min".
 5. **Schedules**: create shifts. Use "Repeat for N days" to fill a month quickly.
@@ -202,7 +203,8 @@ Scans more than the checkpoint radius (default **30 m**) away are **rejected**. 
 | # | Test | Expected |
 |---|---|---|
 | 1 | Guard logs in; Work tab shows today's shift and route | Checkpoints listed with due times |
-| 2 | Personal → Start shift; allow location "All the time" | Status "On shift"; portal live map shows the guard within 2 min |
+| 2 | Personal → type your full name (and ID) → Start shift; allow location "All the time" | Status "On shift"; Work tab shows "On duty: name"; portal live map shows that name within 2 min |
+| 2a | Try Start shift with the name left empty | App refuses: name required |
 | 3 | Scan QR at a checkpoint → Normal → Save | Toast "saved"; Work tab ticks it; portal Scan records shows **Valid** |
 | 4 | Scan the same label 100 m away | Saved, but portal shows **Rejected – too far** and an alarm |
 | 5 | Airplane mode → scan 2 checkpoints with photos | "Saved offline" and "Pending upload"; turn data on → uploads automatically |
@@ -212,7 +214,7 @@ Scans more than the checkpoint radius (default **30 m**) away are **rejected**. 
 | 9 | Skip a checkpoint past its due time + 15 min | "Missed checkpoint" alarm within 5 min |
 | 10 | Android: enable a fake-GPS app, then scan | **Rejected – fake GPS** |
 | 11 | End shift | Tracking notification disappears; live map drops the guard |
-| 12 | Reports → contractor → month → Download PDF | PDF with per-guard completion and punctuality |
+| 12 | Reports → contractor → month → Download PDF | PDF with completion, punctuality and the daily patrol log naming the guard on duty each day |
 
 ## Everyday commands
 

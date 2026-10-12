@@ -37,6 +37,12 @@ export default function PersonalScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
   const [shiftBusy, setShiftBusy] = useState(false);
+  // Security shares one login, so the guard types their own name at the start
+  // of every shift. Deliberately NOT prefilled: yesterday's name must never
+  // carry over to today's guard by accident.
+  const [onDutyName, setOnDutyName] = useState('');
+  const [onDutyRef, setOnDutyRef] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? '');
@@ -71,16 +77,25 @@ export default function PersonalScreen() {
   }
 
   function confirmStart() {
+    const name = onDutyName.trim().replace(/\s+/g, ' ');
+    if (name.length < 3) {
+      setNameError('Enter your full name before starting the shift.');
+      return;
+    }
+    setNameError(null);
     Alert.alert('Location while on shift', LOCATION_DISCLOSURE, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Continue',
         onPress: async () => {
           setShiftBusy(true);
-          const res = await startShift();
+          const res = await startShift(name, onDutyRef);
           setShiftBusy(false);
-          if (res.ok) toast.success(res.message);
-          else toast.error(res.message);
+          if (res.ok) {
+            setOnDutyName('');
+            setOnDutyRef('');
+            toast.success(res.message);
+          } else toast.error(res.message);
         },
       },
     ]);
@@ -147,8 +162,35 @@ export default function PersonalScreen() {
               Scheduled {formatDateTime(shift.scheduled_start)} – {formatTime(shift.scheduled_end)}
             </AppText>
             {shift.actual_start ? <AppText variant="caption">Started at {formatTime(shift.actual_start)}</AppText> : null}
+            {shift.on_duty_name ? (
+              <Info label="Guard on duty" value={shift.on_duty_ref ? `${shift.on_duty_name} (${shift.on_duty_ref})` : shift.on_duty_name} />
+            ) : null}
             {shift.status === 'scheduled' ? (
-              <Button title="Start shift" icon={PlayCircle} onPress={confirmStart} loading={shiftBusy} />
+              <>
+                <TextField
+                  label="Your full name (required)"
+                  value={onDutyName}
+                  onChangeText={(t) => {
+                    setOnDutyName(t);
+                    if (nameError) setNameError(null);
+                  }}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  maxLength={100}
+                  placeholder="e.g. Ahmed Al Hinai"
+                  error={nameError}
+                  hint="Recorded on every scan, alarm and report for today’s patrol. It cannot be changed after you start."
+                />
+                <TextField
+                  label="Employee / ID number (optional)"
+                  value={onDutyRef}
+                  onChangeText={setOnDutyRef}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={50}
+                />
+                <Button title="Start shift" icon={PlayCircle} onPress={confirmStart} loading={shiftBusy} />
+              </>
             ) : null}
             {shift.status === 'active' ? (
               <Button title="End shift" icon={StopCircle} variant="danger" onPress={confirmEnd} loading={shiftBusy} />
@@ -163,7 +205,12 @@ export default function PersonalScreen() {
         <Info label="Email" value={profile?.email} />
         <Info label="Employee no." value={profile?.employee_no} />
         <Info label="Contractor" value={profile?.contractors?.name} />
-        <TextField label="Full name" value={fullName} onChangeText={setFullName} autoComplete="name" />
+        <TextField
+          label="Account name"
+          value={fullName}
+          onChangeText={setFullName}
+          hint="The name of this login. Your own name is entered at Start shift."
+        />
         <TextField label="Mobile number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" />
         <Button title="Save profile" icon={Save} variant="outline" onPress={saveProfile} loading={savingProfile} />
       </Card>

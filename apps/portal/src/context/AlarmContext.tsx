@@ -69,8 +69,14 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
       .channel('alarms-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alarms' }, async (payload) => {
         const alarm = payload.new as Alarm;
-        const { data } = await supabase.from('profiles').select('full_name').eq('id', alarm.guard_id).single();
-        const who = data?.full_name ?? 'A guard';
+        // Shared login: prefer the name typed at Start shift, then the login name.
+        const [shiftRes, profileRes] = await Promise.all([
+          alarm.shift_id
+            ? supabase.from('shifts').select('on_duty_name').eq('id', alarm.shift_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          supabase.from('profiles').select('full_name').eq('id', alarm.guard_id).maybeSingle(),
+        ]);
+        const who = shiftRes.data?.on_duty_name ?? profileRes.data?.full_name ?? 'A guard';
         const label = ALARM_TYPE[alarm.type].label;
         if (alarm.type === 'sos') {
           beep(true);

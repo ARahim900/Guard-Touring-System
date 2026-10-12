@@ -9,6 +9,7 @@ import L from 'leaflet';
 import { useEffect, type ReactNode } from 'react';
 import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 
+import { guardName } from '@/lib/labels';
 import type { Alarm, Checkpoint, LivePosition } from '@/lib/types';
 import { relative } from '@/lib/time';
 
@@ -139,7 +140,7 @@ export function SosLayer({ alarms }: { alarms: Alarm[] }) {
         .map((a) => (
           <Marker key={a.id} position={[a.latitude!, a.longitude!]} icon={icons.sos()} zIndexOffset={1000}>
             <Popup>
-              <strong>SOS · {a.profiles?.full_name}</strong>
+              <strong>SOS · {guardName(a)}</strong>
               <br />
               {relative(a.created_at)}
               <br />

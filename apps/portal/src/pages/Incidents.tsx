@@ -7,7 +7,7 @@ import { ScanDetail } from '@/components/ScanDetail';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Modal, PageHeader, Select, Spinner, Table, Td, Textarea } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
-import { INCIDENT_STATUS, SEVERITY } from '@/lib/labels';
+import { INCIDENT_STATUS, SEVERITY, guardName } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
 import { formatDateTime } from '@/lib/time';
 import type { Incident, IncidentSeverity, IncidentStatus } from '@/lib/types';
@@ -23,7 +23,7 @@ export default function IncidentsPage() {
   const { data, loading, error, reload } = useAsync(async () => {
     let q = supabase
       .from('incidents')
-      .select('*, profiles!incidents_guard_id_fkey(full_name), checkpoints(name)')
+      .select('*, profiles!incidents_guard_id_fkey(full_name), shifts!incidents_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name)')
       .order('created_at', { ascending: false })
       .limit(300);
     if (filter === 'unresolved') q = q.neq('status', 'resolved');
@@ -82,7 +82,7 @@ export default function IncidentsPage() {
               <tr key={i.id}>
                 <Td className="whitespace-nowrap">{formatDateTime(i.created_at)}</Td>
                 <Td>{i.checkpoints?.name}</Td>
-                <Td>{i.profiles?.full_name}</Td>
+                <Td>{guardName(i)}</Td>
                 <Td className="max-w-md">{i.description}</Td>
                 <Td><Badge {...SEVERITY[i.severity]} /></Td>
                 <Td><Badge {...INCIDENT_STATUS[i.status]} /></Td>

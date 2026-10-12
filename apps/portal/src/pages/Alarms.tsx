@@ -8,7 +8,7 @@ import { Badge, Button, Card, EmptyState, ErrorNote, Field, Modal, PageHeader, S
 import { useAlarms } from '@/context/AlarmContext';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
-import { ALARM_STATUS, ALARM_TYPE } from '@/lib/labels';
+import { ALARM_STATUS, ALARM_TYPE, guardName } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
 import { formatDateTime } from '@/lib/time';
 import type { Alarm, AlarmStatus, AlarmType } from '@/lib/types';
@@ -26,7 +26,7 @@ export default function AlarmsPage() {
   const { data, loading, error, reload } = useAsync(async () => {
     let q = supabase
       .from('alarms')
-      .select('*, profiles!alarms_guard_id_fkey(full_name, phone)')
+      .select('*, profiles!alarms_guard_id_fkey(full_name, phone), shifts!alarms_shift_id_fkey(on_duty_name, on_duty_ref)')
       .order('created_at', { ascending: false })
       .limit(300);
     if (status === 'unresolved') q = q.neq('status', 'resolved');
@@ -107,7 +107,7 @@ export default function AlarmsPage() {
                 <Td className="whitespace-nowrap">{formatDateTime(a.created_at)}</Td>
                 <Td><Badge {...ALARM_TYPE[a.type]} /></Td>
                 <Td>
-                  <p className="font-medium">{a.profiles?.full_name}</p>
+                  <p className="font-medium">{guardName(a)}</p>
                   {a.profiles?.phone ? <a className="text-xs underline" href={`tel:${a.profiles.phone}`}>{a.profiles.phone}</a> : null}
                 </Td>
                 <Td>

@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, Spinner, Table, Td, Textarea } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
-import { SHIFT_STATUS } from '@/lib/labels';
+import { SHIFT_STATUS, guardName } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
 import { addDays, dayKey, dayRange, formatDay, formatTime, muscatInstant } from '@/lib/time';
 import type { Profile, Route, Shift } from '@/lib/types';
@@ -95,7 +95,7 @@ export default function ShiftsPage() {
   }
 
   async function cancel(s: Shift) {
-    if (!window.confirm(`Cancel ${s.profiles?.full_name}'s shift on ${formatDay(s.scheduled_start)}?`)) return;
+    if (!window.confirm(`Cancel ${guardName(s)}'s shift on ${formatDay(s.scheduled_start)}?`)) return;
     const { error: e } = await supabase.from('shifts').update({ status: 'cancelled' }).eq('id', s.id);
     if (e) return toast.error(friendlyError(e));
     toast.success('Shift cancelled.');
@@ -146,7 +146,13 @@ export default function ShiftsPage() {
                     {list.map((s) => (
                       <tr key={s.id}>
                         <Td className="whitespace-nowrap">{formatTime(s.scheduled_start)} – {formatTime(s.scheduled_end)}</Td>
-                        <Td className="font-medium">{s.profiles?.full_name}</Td>
+                        <Td className="font-medium">
+                          {guardName(s)}
+                          {s.on_duty_ref ? <span className="block text-xs font-normal text-muted-foreground">ID {s.on_duty_ref}</span> : null}
+                          {s.on_duty_name && s.profiles?.full_name ? (
+                            <span className="block text-xs font-normal text-muted-foreground">Login: {s.profiles.full_name}</span>
+                          ) : null}
+                        </Td>
                         <Td>{s.routes?.name}</Td>
                         <Td><Badge {...SHIFT_STATUS[s.status]} /></Td>
                         <Td className="text-xs text-muted-foreground">

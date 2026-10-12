@@ -67,8 +67,18 @@ export interface Shift {
   actual_end: string | null;
   status: ShiftStatus;
   notes: string | null;
+  /** Name typed by the guard at Start shift (security shares one login). */
+  on_duty_name: string | null;
+  /** Optional employee / ID number typed at Start shift. */
+  on_duty_ref: string | null;
   profiles?: { full_name: string } | null;
   routes?: { name: string } | null;
+}
+
+/** Who was on duty, embedded from the shift on scans, alarms and incidents. */
+export interface OnDuty {
+  on_duty_name: string | null;
+  on_duty_ref: string | null;
 }
 
 export interface Scan {
@@ -97,6 +107,7 @@ export interface Scan {
   review_note: string | null;
   reviewed_at: string | null;
   profiles?: { full_name: string } | null;
+  shifts?: OnDuty | null;
   checkpoints?: { name: string } | null;
   scan_attachments?: Attachment[];
 }
@@ -130,11 +141,13 @@ export interface Alarm {
   resolution_note: string | null;
   created_at: string;
   profiles?: { full_name: string; phone: string | null } | null;
+  shifts?: OnDuty | null;
 }
 
 export interface Incident {
   id: string;
   scan_id: string | null;
+  shift_id: string | null;
   guard_id: string;
   checkpoint_id: string | null;
   description: string;
@@ -144,6 +157,7 @@ export interface Incident {
   resolved_at: string | null;
   created_at: string;
   profiles?: { full_name: string } | null;
+  shifts?: OnDuty | null;
   checkpoints?: { name: string } | null;
 }
 
@@ -174,4 +188,23 @@ export interface ReportRow {
   incidents: number;
   sos: number;
   rejected_scans: number;
+}
+
+/** One row of daily_patrol_log: one shift (normally one per day). */
+export interface DailyLogRow {
+  shift_id: string;
+  patrol_date: string; // YYYY-MM-DD, Muscat time
+  on_duty_name: string;
+  on_duty_ref: string | null;
+  login_name: string;
+  route_name: string;
+  status: ShiftStatus;
+  scheduled_start: string;
+  actual_start: string | null;
+  actual_end: string | null;
+  checkpoints_total: number;
+  visited: number;
+  on_time: number;
+  incidents: number;
+  sos: number;
 }

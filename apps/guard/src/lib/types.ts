@@ -34,6 +34,10 @@ export interface Shift {
   actual_end: string | null;
   status: ShiftStatus;
   notes: string | null;
+  /** Name typed by the guard at Start shift (shared security login). */
+  on_duty_name: string | null;
+  /** Optional employee / ID number typed at Start shift. */
+  on_duty_ref: string | null;
   routes?: { name: string } | null;
 }
 

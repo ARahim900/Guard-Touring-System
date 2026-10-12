@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { ScanDetail } from '@/components/ScanDetail';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, Spinner, Table, Td } from '@/components/ui';
-import { FLAG_LABELS, VALIDATION } from '@/lib/labels';
+import { FLAG_LABELS, VALIDATION, guardName } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
 import { addDays, dayKey, dayRange, formatDateTime } from '@/lib/time';
 import type { Profile, Scan } from '@/lib/types';
@@ -23,7 +23,7 @@ export default function ScansPage() {
   const { data, loading, error, reload } = useAsync(async () => {
     let q = supabase
       .from('scans')
-      .select('*, profiles!scans_guard_id_fkey(full_name), checkpoints(name), scan_attachments(id, type)')
+      .select('*, profiles!scans_guard_id_fkey(full_name), shifts!scans_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name), scan_attachments(id, type)')
       .gte('effective_time', dayRange(from).from)
       .lt('effective_time', dayRange(to).to)
       .order('effective_time', { ascending: false })
@@ -39,7 +39,7 @@ export default function ScansPage() {
     const rows = [
       ['Time (Muscat)', 'Guard', 'Checkpoint', 'Method', 'Status', 'Verdict', 'On time', 'Distance m', 'GPS accuracy m', 'Flags', 'Note'],
       ...(data ?? []).map((s) => [
-        formatDateTime(s.effective_time), s.profiles?.full_name ?? '', s.checkpoints?.name ?? '', s.method, s.status, s.validation,
+        formatDateTime(s.effective_time), guardName(s), s.checkpoints?.name ?? '', s.method, s.status, s.validation,
         s.is_on_time === null ? '' : s.is_on_time ? 'Yes' : 'No', s.distance_m ?? '', s.accuracy_m ?? '', s.flags.join(' '), s.note ?? '',
       ]),
     ];
@@ -91,7 +91,7 @@ export default function ScansPage() {
               {data.map((s) => (
                 <tr key={s.id} className="cursor-pointer hover:bg-muted" onClick={() => setOpenId(s.id)}>
                   <Td className="whitespace-nowrap">{formatDateTime(s.effective_time)}</Td>
-                  <Td>{s.profiles?.full_name}</Td>
+                  <Td>{guardName(s)}</Td>
                   <Td>{s.checkpoints?.name}</Td>
                   <Td>{s.status === 'issue' ? <Badge label="Issue" tone="danger" /> : <Badge label="Normal" />}</Td>
                   <Td><Badge {...VALIDATION[s.validation]} /></Td>

@@ -8,8 +8,9 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 
-import { formatDateTime } from './time';
-import type { Incident, ReportRow } from './types';
+import { guardName, SHIFT_STATUS } from './labels';
+import { formatDateTime, formatDay, formatTime } from './time';
+import type { DailyLogRow, Incident, ReportRow } from './types';
 
 const PRIMARY: [number, number, number] = [78, 68, 86]; // #4E4456
 const TEAL: [number, number, number] = [161, 209, 213]; // #A1D1D5
@@ -20,6 +21,8 @@ export interface ReportInput {
   monthLabel: string; // e.g. "October 2026"
   rows: ReportRow[];
   incidents: Incident[];
+  /** One row per shift (normally one per day), with the guard on duty. */
+  daily: DailyLogRow[];
   generatedBy: string;
   /** Muscat Bay mark as a PNG data URL (see loadLogo). Optional. */
   logoDataUrl?: string | null;
@@ -99,7 +102,7 @@ export function buildReportPdf(input: ReportInput): jsPDF {
   // ---- Per-guard table
   autoTable(doc, {
     startY: 60,
-    head: [['Guard', 'Emp. no.', 'Shifts', 'Missed shifts', 'Due', 'Visited', 'Completion', 'On time', 'Punctuality', 'Incidents', 'SOS', 'Rejected scans']],
+    head: [['Guard / login', 'Emp. no.', 'Shifts', 'Missed shifts', 'Due', 'Visited', 'Completion', 'On time', 'Punctuality', 'Incidents', 'SOS', 'Rejected scans']],
     body: input.rows.map((r) => [
       r.full_name,
       r.employee_no ?? '–',
@@ -124,14 +127,49 @@ export function buildReportPdf(input: ReportInput): jsPDF {
     margin: { left: 14, right: 14, bottom: 24 }, // room for the footer and definitions
   });
 
+  const lastY = () => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  /** Start a new section, on a new page if it would collide with the footer. */
+  const sectionStart = () => {
+    const next = lastY() + 10;
+    if (next > doc.internal.pageSize.getHeight() - 40) {
+      doc.addPage();
+      return 20;
+    }
+    return next;
+  };
+
+  // ---- Daily patrol log (security shares one login, so this names the guard on duty each day)
+  let y = sectionStart();
+  doc.setTextColor(...PRIMARY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text(`Daily patrol log (${input.daily.length})`, 14, y);
+  doc.setFont('helvetica', 'normal');
+  autoTable(doc, {
+    startY: y + 3,
+    head: [['Date', 'Guard on duty', 'ID', 'Route', 'Status', 'Started', 'Ended', 'Visited / due', 'On time', 'Incidents', 'SOS']],
+    body: input.daily.map((d) => [
+      formatDay(`${d.patrol_date}T12:00:00+04:00`),
+      d.on_duty_name,
+      d.on_duty_ref ?? '–',
+      d.route_name,
+      SHIFT_STATUS[d.status].label,
+      d.actual_start ? formatTime(d.actual_start) : '–',
+      d.actual_end ? formatTime(d.actual_end) : '–',
+      `${d.visited} / ${d.checkpoints_total}`,
+      d.on_time,
+      d.incidents,
+      d.sos,
+    ]),
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 8, cellPadding: 1.8 },
+    headStyles: { fillColor: PRIMARY, textColor: 255 },
+    alternateRowStyles: { fillColor: [247, 248, 249] },
+    margin: { left: 14, right: 14, bottom: 24 },
+  });
+
   // ---- Incidents
-  const afterTable = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-  // Start the incidents section on a new page if it would collide with the footer.
-  let y = afterTable + 10;
-  if (y > doc.internal.pageSize.getHeight() - 40) {
-    doc.addPage();
-    y = 20;
-  }
+  y = sectionStart();
   doc.setTextColor(...PRIMARY);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -141,7 +179,7 @@ export function buildReportPdf(input: ReportInput): jsPDF {
     autoTable(doc, {
       startY: y + 3,
       head: [['Date', 'Guard', 'Checkpoint', 'Description', 'Severity', 'Status']],
-      body: input.incidents.map((i) => [formatDateTime(i.created_at), i.profiles?.full_name ?? '', i.checkpoints?.name ?? '', i.description, i.severity, i.status.replace('_', ' ')]),
+      body: input.incidents.map((i) => [formatDateTime(i.created_at), guardName(i), i.checkpoints?.name ?? '', i.description, i.severity, i.status.replace('_', ' ')]),
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 1.8 },
       headStyles: { fillColor: PRIMARY, textColor: 255 },

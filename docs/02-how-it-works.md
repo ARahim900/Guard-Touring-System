@@ -87,6 +87,14 @@ This is accurate however long the scan waited in the outbox. It also catches a g
 - If a route is later edited, only **not-yet-started** shifts pick up the change. Started and past shifts keep what they were patrolled against, so **last month's report never changes.**
 - One shift is **one pass** of the route. For repeated rounds in a night, schedule several shorter shifts (e.g. 22:00–00:00, 00:00–02:00). Or ask for a "rounds per shift" enhancement.
 
+### One shared security login: "guard on duty"
+Muscat Bay security uses **one shared login**, with one guard patrolling once a day. A login alone cannot tell us *who* patrolled, so:
+- At **Personal → Start shift** the guard must type their **full name** (required) and, optionally, an **employee / ID number**. The field is never prefilled, so yesterday's name cannot carry over by accident.
+- The name is stored on the shift (`shifts.on_duty_name`, `on_duty_ref`) by `start_shift_as()`. **It cannot be changed afterwards** from the app; pressing Start again keeps the first name.
+- Every scan, alarm, SOS, incident, the live map and the reports show this name. Records from before this change fall back to the login's name.
+- **Reports → daily patrol log** lists one row per day: date, guard on duty, ID, route, visited / due, on time, incidents and SOS. It is also in the PDF.
+- Limit to be aware of: the name is typed, not verified. A supervisor should check it against the duty roster. For stronger proof, give each guard their own login later; the system already supports that.
+
 ## 2.5 Alarms and the 5-minute monitor
 `run_patrol_monitor()` runs every 5 minutes (pg_cron). It:
 
@@ -135,4 +143,5 @@ The radius is set **per checkpoint** on the portal's Checkpoints page (default 3
 | Start shift needs signal | The server must confirm the shift | Scans still work and are flagged `shift_not_started` |
 | Indoor GPS is imprecise | Physics | Per-checkpoint radius, NFC, supervisor review (see installation 5.1) |
 | One pass per shift | Keeps the model simple and auditable | Several shorter shifts, or a rounds enhancement |
+| Shared login: name is typed, not verified | Security chose one login for all guards | Check against the duty roster, or move to one login per guard |
 | Map tiles from OpenStreetMap | Free, no key | For heavy use, switch the tile URL in `PatrolMap.tsx` to a paid provider |

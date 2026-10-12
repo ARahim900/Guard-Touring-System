@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Badge, Button, ErrorNote, Field, Select, Spinner, Textarea } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
-import { FLAG_LABELS, VALIDATION } from '@/lib/labels';
+import { FLAG_LABELS, VALIDATION, guardName } from '@/lib/labels';
 import { MEDIA_BUCKET, supabase } from '@/lib/supabase';
 import { formatDateTime } from '@/lib/time';
 import type { Scan, ScanValidation } from '@/lib/types';
@@ -29,7 +29,7 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
       unwrap(
         await supabase
           .from('scans')
-          .select('*, profiles!scans_guard_id_fkey(full_name), checkpoints(name), scan_attachments(*)')
+          .select('*, profiles!scans_guard_id_fkey(full_name), shifts!scans_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name), scan_attachments(*)')
           .eq('id', scanId)
           .single(),
       ) as Scan,
@@ -83,7 +83,7 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
       </div>
 
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-        <Item label="Guard" value={scan.profiles?.full_name} />
+        <Item label="Guard" value={guardName(scan)} />
         <Item label="Checkpoint" value={scan.checkpoints?.name} />
         <Item label="Scan time (corrected)" value={formatDateTime(scan.effective_time)} />
         <Item label="Due" value={scan.due_at ? formatDateTime(scan.due_at) : '–'} />

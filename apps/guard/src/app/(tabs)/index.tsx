@@ -80,6 +80,11 @@ export default function WorkScreen() {
             <AppText variant="body">
               {formatDate(shift.scheduled_start)} · {formatTime(shift.scheduled_start)} – {formatTime(shift.scheduled_end)}
             </AppText>
+            {shift.on_duty_name ? (
+              <AppText variant="label">
+                On duty: <AppText variant="label" style={{ fontFamily: fonts.bold }}>{shift.on_duty_name}</AppText>
+              </AppText>
+            ) : null}
             <View style={styles.rowBetween}>
               <AppText variant="label">Checkpoints</AppText>
               <AppText variant="label" style={{ fontFamily: fonts.bold }}>

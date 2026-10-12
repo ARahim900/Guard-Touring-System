@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 import { BaseMap, CheckpointLayer, FitBounds, GuardLayer, SosLayer } from '@/components/PatrolMap';
 import { Badge, Card, PageHeader, StatCard, Table, Td } from '@/components/ui';
 import { useAlarms } from '@/context/AlarmContext';
-import { ALARM_STATUS, ALARM_TYPE, SHIFT_STATUS } from '@/lib/labels';
+import { ALARM_STATUS, ALARM_TYPE, SHIFT_STATUS, guardName } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
 import { dayKey, dayRange, formatDay, formatTime, relative } from '@/lib/time';
 import type { Alarm, Shift } from '@/lib/types';
@@ -37,7 +37,7 @@ export default function DashboardPage() {
     const alarms = unwrap(
       await supabase
         .from('alarms')
-        .select('*, profiles!alarms_guard_id_fkey(full_name, phone)')
+        .select('*, profiles!alarms_guard_id_fkey(full_name, phone), shifts!alarms_shift_id_fkey(on_duty_name, on_duty_ref)')
         .neq('status', 'resolved')
         .order('created_at', { ascending: false })
         .limit(8),
@@ -88,7 +88,7 @@ export default function DashboardPage() {
                       <Badge {...ALARM_STATUS[a.status]} />
                     </div>
                     <p className="mt-1 text-sm">{a.message}</p>
-                    <p className="text-xs text-muted-foreground">{a.profiles?.full_name} · {relative(a.created_at)}</p>
+                    <p className="text-xs text-muted-foreground">{guardName(a)} · {relative(a.created_at)}</p>
                   </div>
                 </li>
               ))}
@@ -106,7 +106,7 @@ export default function DashboardPage() {
             const c = rows.filter((r) => r.completed).length;
             return (
               <tr key={s.id}>
-                <Td className="font-medium">{s.profiles?.full_name}</Td>
+                <Td className="font-medium">{guardName(s)}</Td>
                 <Td>{s.routes?.name}</Td>
                 <Td>{formatTime(s.scheduled_start)} – {formatTime(s.scheduled_end)}</Td>
                 <Td><Badge {...SHIFT_STATUS[s.status]} /></Td>

@@ -3,6 +3,7 @@ import { Phone, RefreshCw } from 'lucide-react';
 
 import { BaseMap, CheckpointLayer, FitBounds, GuardLayer, SosLayer } from '@/components/PatrolMap';
 import { Badge, Button, Card, PageHeader } from '@/components/ui';
+import { guardName } from '@/lib/labels';
 import { formatTime, relative } from '@/lib/time';
 import { useLiveData } from '@/lib/useLiveData';
 
@@ -36,7 +37,7 @@ export default function LiveMapPage() {
               <ul className="space-y-3">
                 {alarms.map((a) => (
                   <li key={a.id} className="rounded-md border border-status-danger bg-danger-bg p-3">
-                    <p className="font-semibold text-danger-text">{a.profiles?.full_name}</p>
+                    <p className="font-semibold text-danger-text">{guardName(a)}</p>
                     <p className="text-xs text-danger-text">{relative(a.created_at)}</p>
                     {a.profiles?.phone ? (
                       <a href={`tel:${a.profiles.phone}`} className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-danger-text underline">

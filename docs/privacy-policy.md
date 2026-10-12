@@ -3,10 +3,10 @@
 > Draft for Muscat Bay's review. Complete every item in **[square brackets]** and have it checked by Legal before release. Keep this text identical to `apps/guard/src/app/privacy.tsx` and `apps/portal/src/pages/Privacy.tsx`.
 
 ## Who we are
-MB Patrol is an internal tool operated by Soraya Bandar Jissa SBJ ("Muscat Bay") for security patrols within the Muscat Bay community, Sultanate of Oman. It is used only by guards whose accounts are created by Muscat Bay or its security contractors.
+MB Patrol is an internal tool operated by Saraya Bandar Jissah SAOC ("Muscat Bay") for security patrols within the Muscat Bay community, Sultanate of Oman. It is used only by guards whose accounts are created by Muscat Bay or its security contractors.
 
 ## What we collect and why
-- **Account details**: name, work email, employee number, phone number and contractor. Used to sign you in and to identify your patrol records.
+- **Account details**: name, work email, employee number, phone number and contractor. Used to sign you in and to identify your patrol records. Where a login is shared, the name and optional ID number you type at Start shift are recorded with that shift for the same purpose.
 - **Checkpoint scans**: the checkpoint, the time on your phone and on our server, your GPS position and its accuracy, and whether the phone reported a simulated ("mock") location. Used to confirm that each checkpoint was visited.
 - **Location during shifts**: while your shift is active, your position is recorded about once a minute, including when the app is closed or not in use. This lets supervisors see patrol progress and respond to an SOS. Location is never collected outside an active shift. Tracking stops when you end your shift.
 - **Photos, voice memos and notes** that you choose to attach to a scan. Gallery photos are checked against the date they were taken, so photos taken before your shift can be reviewed.

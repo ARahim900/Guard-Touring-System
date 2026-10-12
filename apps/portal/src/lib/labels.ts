@@ -58,3 +58,16 @@ export const SEVERITY: Record<IncidentSeverity, { label: string; tone: Tone }> =
   high: { label: 'High', tone: 'warning' },
   critical: { label: 'Critical', tone: 'danger' },
 };
+
+/**
+ * The person to show for a shift, scan, alarm or incident.
+ * Security shares one login, so the name typed at Start shift ("on duty")
+ * wins; older records without it fall back to the login's name.
+ */
+export function guardName(row: {
+  on_duty_name?: string | null;
+  shifts?: { on_duty_name: string | null } | null;
+  profiles?: { full_name: string } | null;
+}): string {
+  return row.on_duty_name ?? row.shifts?.on_duty_name ?? row.profiles?.full_name ?? '–';
+}

@@ -23,7 +23,7 @@ export function useLiveData() {
       supabase.from('live_guard_positions').select('*'),
       supabase
         .from('alarms')
-        .select('*, profiles!alarms_guard_id_fkey(full_name, phone)')
+        .select('*, profiles!alarms_guard_id_fkey(full_name, phone), shifts!alarms_shift_id_fkey(on_duty_name, on_duty_ref)')
         .eq('type', 'sos')
         .neq('status', 'resolved')
         .order('created_at', { ascending: false }),

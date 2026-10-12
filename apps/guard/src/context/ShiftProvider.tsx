@@ -36,7 +36,8 @@ interface ShiftContextValue {
   refresh: () => Promise<void>;
   /** Re-read the local outbox (call after saving a scan). */
   reloadLocal: () => Promise<void>;
-  startShift: () => Promise<{ ok: boolean; message: string }>;
+  /** Start the shift and record who is on duty (the login is shared). */
+  startShift: (onDutyName: string, onDutyRef?: string) => Promise<{ ok: boolean; message: string }>;
   endShift: () => Promise<{ ok: boolean; message: string }>;
 }
 
@@ -168,10 +169,16 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     })();
   }, [snapshot.shift, loading, fromCache]);
 
-  const startShift = useCallback(async () => {
+  const startShift = useCallback(async (onDutyName: string, onDutyRef?: string) => {
     const shift = snapshot.shift;
     if (!shift) return { ok: false, message: 'No shift is assigned to you.' };
-    const { error: rpcError } = await supabase.rpc('start_shift', { p_shift_id: shift.id });
+    const name = onDutyName.trim();
+    if (name.length < 3) return { ok: false, message: 'Enter your full name to start the shift.' };
+    const { error: rpcError } = await supabase.rpc('start_shift_as', {
+      p_shift_id: shift.id,
+      p_on_duty_name: name,
+      p_on_duty_ref: onDutyRef?.trim() || null,
+    });
     if (rpcError) return { ok: false, message: friendlyError(rpcError) };
     const tracking = await startTracking(shift.id, guardId!).catch((e) => {
       reportError(e, { where: 'startTracking' });
@@ -185,7 +192,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       return { ok: true, message: 'Shift started. Allow location "All the time" so tracking continues in your pocket.' };
     }
     return { ok: true, message: 'Shift started. Have a safe patrol.' };
-  }, [snapshot.shift, load]);
+  }, [snapshot.shift, load, guardId]);
 
   const endShift = useCallback(async () => {
     const shift = snapshot.shift;
