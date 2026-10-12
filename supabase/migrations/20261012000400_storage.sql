@@ -46,10 +46,18 @@ create policy "patrol-media: guard uploads to own scan folder"
   with check (bucket_id = 'patrol-media' and public.owns_scan_folder(name));
 
 -- Needed for "upsert" so a retried upload can overwrite a half-finished one.
-create policy "patrol-media: guard updates own scan files"
+-- Once the attachment's metadata row exists the file is final evidence and can
+-- no longer be replaced or moved.
+create policy "patrol-media: guard updates own unfinished scan files"
   on storage.objects for update to authenticated
-  using (bucket_id = 'patrol-media' and public.owns_scan_folder(name))
-  with check (bucket_id = 'patrol-media' and public.owns_scan_folder(name));
+  using (
+    bucket_id = 'patrol-media' and public.owns_scan_folder(name)
+    and not exists (select 1 from public.scan_attachments a where a.storage_path = objects.name)
+  )
+  with check (
+    bucket_id = 'patrol-media' and public.owns_scan_folder(name)
+    and not exists (select 1 from public.scan_attachments a where a.storage_path = objects.name)
+  );
 
 create policy "patrol-media: guard or staff reads"
   on storage.objects for select to authenticated

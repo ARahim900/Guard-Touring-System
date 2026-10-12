@@ -119,7 +119,9 @@ begin
   -- 1. Does the scanned value belong to this checkpoint?
   if not (
        (p_method in ('qr', 'barcode') and p_raw_value = v_cp.code)
-    or (p_method = 'nfc' and (upper(p_raw_value) = upper(coalesce(v_cp.nfc_uid, '')) or p_raw_value = v_cp.code))
+    or (p_method = 'nfc' and (
+          (v_cp.nfc_uid is not null and upper(p_raw_value) = upper(v_cp.nfc_uid))
+          or p_raw_value = v_cp.code))
   ) then
     v_flags := v_flags || 'code_mismatch'::text;
     v_reject := true;
@@ -402,6 +404,7 @@ as $$
   select s.id, rc.checkpoint_id, rc.sequence, rc.due_offset_min
   from public.shifts s
   join public.route_checkpoints rc on rc.route_id = s.route_id
+  join public.checkpoints c on c.id = rc.checkpoint_id and c.active  -- retired checkpoints are not due
   where s.id = p_shift_id;
 $$;
 revoke all on function public.snapshot_shift_checkpoints(uuid) from public, anon, authenticated;
@@ -447,6 +450,35 @@ $$;
 create trigger route_checkpoints_refresh_shifts
   after insert or update or delete on public.route_checkpoints
   for each row execute function public.on_route_checkpoints_changed();
+
+-- Retiring (or re-activating) a checkpoint refreshes not-yet-started shifts.
+create or replace function public.on_checkpoint_active_changed()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_shift uuid;
+begin
+  for v_shift in
+    select distinct s.id
+    from public.shifts s
+    join public.route_checkpoints rc on rc.route_id = s.route_id
+    where s.status = 'scheduled' and rc.checkpoint_id = new.id
+  loop
+    perform public.snapshot_shift_checkpoints(v_shift);
+  end loop;
+  return null;
+end;
+$$;
+
+create trigger checkpoints_active_refresh_shifts
+  after update of active on public.checkpoints
+  for each row when (old.active is distinct from new.active)
+  execute function public.on_checkpoint_active_changed();
+
+-- A guard can be on only one active shift at a time. The check in
+-- start_shift() alone could be beaten by two simultaneous requests.
+create unique index shifts_one_active_per_guard on public.shifts (guard_id) where status = 'active';
 
 -- ---------------------------------------------------------------------------
 -- shift_checkpoint_status: one row per (shift, route checkpoint) with its

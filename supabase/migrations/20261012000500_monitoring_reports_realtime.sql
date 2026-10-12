@@ -62,7 +62,7 @@ begin
   -- d) Started but never ended, two hours after the scheduled end.
   update public.shifts
      set status = 'completed',
-         actual_end = scheduled_end,
+         actual_end = scheduled_end + v_grace,  -- keeps the normal late-scan window
          notes = concat_ws(' ', notes, '[Auto-closed: guard did not end the shift]')
    where status = 'active' and scheduled_end + interval '2 hours' < now();
   get diagnostics v_auto_closed = row_count;

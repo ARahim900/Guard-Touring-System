@@ -108,6 +108,12 @@ begin
     return new;  -- server-side call (service role / SQL editor)
   end if;
 
+  -- Supervisors manage guards only; supervisor and admin profiles are for admins
+  -- (anyone may still edit their own name and phone).
+  if not public.is_admin() and old.role <> 'guard' and old.id <> auth.uid() then
+    raise exception 'Only admins can change supervisor or admin profiles' using errcode = '42501';
+  end if;
+
   if new.id <> old.id or new.email is distinct from old.email then
     raise exception 'Profile id and email cannot be changed here' using errcode = '42501';
   end if;
@@ -296,9 +302,17 @@ create policy "alarms: staff update" on public.alarms
 create policy "pings: own or staff read" on public.location_pings
   for select to authenticated
   using (guard_id = (select auth.uid()) or (select public.is_staff()));
-create policy "pings: guard adds own for own shift" on public.location_pings
+-- Only for a shift the guard has started (points may upload after it ends,
+-- from the offline queue), and only with a believable timestamp: a point dated
+-- in the future would otherwise pin the guard's position on the live map.
+create policy "pings: guard adds own for own started shift" on public.location_pings
   for insert to authenticated
   with check (
     guard_id = (select auth.uid())
-    and exists (select 1 from public.shifts s where s.id = shift_id and s.guard_id = (select auth.uid()))
+    and recorded_at <= now() + interval '5 minutes'
+    and recorded_at > now() - interval '7 days'
+    and exists (
+      select 1 from public.shifts s
+      where s.id = shift_id and s.guard_id = (select auth.uid()) and s.actual_start is not null
+    )
   );

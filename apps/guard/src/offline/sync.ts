@@ -139,6 +139,13 @@ async function syncAttachments(guardId: string) {
       upsert: true,
     });
     if (upError) {
+      // A previous run may have finished (file + metadata row) but stopped before
+      // marking it done here. The server then refuses the overwrite: that is success.
+      const { data: existing } = await supabase.from('scan_attachments').select('id').eq('id', att.id).maybeSingle();
+      if (existing) {
+        await markAttachmentUploaded(att.id);
+        continue;
+      }
       const status = Number((upError as { statusCode?: string | number }).statusCode ?? 0);
       const permanent = status === 400 || status === 403 || status === 413;
       await bumpAttachmentAttempt(att.id, friendlyError(upError), permanent);
