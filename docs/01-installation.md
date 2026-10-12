@@ -80,11 +80,13 @@ Check it worked:
 - **Integrations → Cron** (or Database → Cron): a job called **patrol-monitor** that runs every 5 minutes.
 
 ### 2.3 Deploy the Edge Function (account management)
-Why: creating a login needs the `service_role` key. That key must stay on Supabase's servers, so the portal asks this function to create accounts instead.
+Why: creating a login needs the secret key (`sb_secret_…`, formerly `service_role`). That key must stay on Supabase's servers, so the portal asks this function to create accounts instead.
 ```bash
-npx supabase functions deploy admin-users --project-ref zdezuylsruzbddqcdhog
+npx supabase functions deploy admin-users --project-ref zdezuylsruzbddqcdhog --no-verify-jwt
 ```
-You do not need to set any secret. Supabase gives every function its own `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` automatically.
+You do not need to set any secret. Supabase gives every function its own `SUPABASE_URL` and `SUPABASE_SECRET_KEYS` automatically.
+
+`--no-verify-jwt` is required: the platform's built-in JWT check only understands the legacy keys, which are switched off (step 2.6). The function checks the caller's login itself.
 
 ### 2.4 Make yourself the first admin
 1. Dashboard → **Authentication** → **Users** → **Add user** → **Create new user**. Enter your email and a strong password, and tick **Auto Confirm User**.
@@ -95,9 +97,17 @@ Dashboard → **Advisors** → **Security Advisor**. It should show no "RLS disa
 
 ### 2.6 Rotate the leaked `service_role` key
 The `service_role` key was pasted into a chat while this system was being built. Treat it as compromised: anyone holding it can read and delete all data.
-- Dashboard → **Project Settings** → **API Keys**. Follow Supabase's current procedure to rotate or replace the secret (`service_role`) key, and disable the old one.
-- After rotating, run step 2.3 again and create a test account from the portal (step 3.3). This confirms the Edge Function still works.
-- If the `anon` key changes too, update both `.env` files and the Netlify and EAS variables.
+The fix is to move to Supabase's new key pair and switch the legacy keys off:
+
+| Legacy key (off) | Replaced by | Used by |
+|---|---|---|
+| `anon` | Publishable key `sb_publishable_…` | Portal and guard app (`VITE_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) |
+| `service_role` | Secret key `sb_secret_…` | `admin-users` Edge Function only (read from `SUPABASE_SECRET_KEYS`) |
+
+1. Put the **publishable** key in both `.env` files and the Netlify and EAS variables. The variable names stay the same.
+2. Deploy the Edge Function as in step 2.3.
+3. Dashboard → **Project Settings** → **API Keys** → **Legacy API keys** → **Disable JWT-based API keys**. This kills the leaked `service_role` key. It can be re-enabled if something was missed.
+4. Create a test account from the portal (step 3.3). This confirms the Edge Function still works.
 
 ---
 
@@ -109,7 +119,7 @@ cd apps/portal
 npm ci                         # installs the exact package versions in package-lock.json
 cp .env.example .env.local     # Windows PowerShell: Copy-Item .env.example .env.local
 ```
-Open `.env.local` and paste the **anon public** key after `VITE_SUPABASE_ANON_KEY=`. Find it under Dashboard → Project Settings → API. **Never paste the service_role key here.**
+Open `.env.local` and paste the **publishable** key (`sb_publishable_…`) after `VITE_SUPABASE_ANON_KEY=`. Find it under Dashboard → Project Settings → API Keys. **Never paste a secret key here.**
 ```bash
 npm run dev                    # open http://localhost:5173 and sign in as the admin
 ```
@@ -147,7 +157,7 @@ NFC, background location and Sentry use native code that the general-purpose **E
 ```bash
 cd apps/guard
 npm ci
-cp .env.example .env            # then paste the anon key and the control-room number
+cp .env.example .env            # then paste the publishable key and the control-room number
 npm install -g eas-cli
 eas login
 eas init                        # creates the Expo project and prints its ID
@@ -158,7 +168,7 @@ eas init                        # creates the Expo project and prints its ID
 `.env` stays on your computer, so EAS needs its own copy of the public values. Run this once per environment (`development`, `preview`, `production`):
 ```bash
 eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_URL --value https://zdezuylsruzbddqcdhog.supabase.co --visibility plaintext
-eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <anon key> --visibility plaintext
+eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <publishable key> --visibility plaintext
 eas env:create --environment development --name EXPO_PUBLIC_CONTROL_ROOM_PHONE --value +96824857781 --visibility plaintext
 # Optional crash reporting:
 eas env:create --environment development --name EXPO_PUBLIC_SENTRY_DSN --value <dsn> --visibility plaintext

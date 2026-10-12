@@ -58,9 +58,9 @@ Patrolling_Tour_System/
 
 ## Security: read this first
 
-- **The `service_role` key must never be in any app, file or Git commit.** It bypasses every security rule. It lives only inside Supabase, where the Edge Function reads it automatically.
-- The `service_role` key was shared in a chat message while this was being built. **Rotate it in Supabase before go-live.** See [installation step 2.6](docs/01-installation.md#26-rotate-the-leaked-service_role-key).
-- The `anon` key in the apps is public by design. Security comes from Row Level Security in the database, which is enabled on every table.
+- **The secret key (`sb_secret_…`, formerly `service_role`) must never be in any app, file or Git commit.** It bypasses every security rule. It lives only inside Supabase, where the Edge Function reads it automatically.
+- The legacy `service_role` key was shared in a chat message while this was being built. The fix is to switch the legacy keys off; the apps use the new **publishable** key and the Edge Function uses the new **secret** key. See [installation step 2.6](docs/01-installation.md#26-rotate-the-leaked-service_role-key).
+- The publishable key in the apps is public by design. Security comes from Row Level Security in the database, which is enabled on every table.
 
 ## What has been tested
 
