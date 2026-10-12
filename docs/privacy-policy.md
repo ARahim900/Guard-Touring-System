@@ -21,11 +21,11 @@ MB Patrol is an internal tool operated by Soraya Bandar Jissa SBJ ("Muscat Bay")
 
 ## How long we keep it
 - **GPS trail** recorded during shifts: deleted automatically after 90 days.
-- **Scans, photos, voice memos, incidents and alarms**: kept as patrol records for [retention period, e.g. 3 years], then deleted, unless needed for an investigation.
+- **Scans, photos, voice memos, incidents and alarms**: kept permanently as Muscat Bay's security patrol records.
 - **Account details**: kept while you work on the Muscat Bay site, then deactivated.
 
 ## Your rights
-- Under the Oman Personal Data Protection Law (Royal Decree 6/2022), you may ask to see, correct or delete your personal data. This is subject to Muscat Bay's legal and security obligations. Contact [privacy contact email].
+- Under the Oman Personal Data Protection Law (Royal Decree 6/2022), you may ask to see, correct or delete your personal data. This is subject to Muscat Bay's legal and security obligations. Contact security@muscatbay.com or aalbalushi@muscatbay.com.
 - You can turn off location, camera, microphone or photo access in your phone settings at any time. Without location, scans cannot be verified.
 
 ## Changes
