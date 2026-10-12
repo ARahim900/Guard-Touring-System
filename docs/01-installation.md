@@ -88,7 +88,7 @@ You do not need to set any secret. Supabase gives every function its own `SUPABA
 
 Before deploying, check **Project Settings → API Keys → Publishable and secret API keys** shows a publishable key and a secret key named `default`. Older projects must press **Create new API keys** first; without them `SUPABASE_SECRET_KEYS` does not exist and the function fails at start-up.
 
-`--no-verify-jwt` is required: the platform's built-in JWT check only understands the legacy keys, which are switched off (step 2.6). The function checks the caller's login itself.
+`--no-verify-jwt` is required: the platform's built-in JWT check only understands the legacy keys, which are switched off (step 2.6). The function checks the caller's login itself, so it stays protected. **Always deploy with this flag**, or account creation will fail.
 
 ### 2.4 Make yourself the first admin
 1. Dashboard → **Authentication** → **Users** → **Add user** → **Create new user**. Enter your email and a strong password, and tick **Auto Confirm User**.
