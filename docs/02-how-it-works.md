@@ -89,8 +89,8 @@ This is accurate however long the scan waited in the outbox. It also catches a g
 
 ### One shared security login: "guard on duty"
 Muscat Bay security uses **one shared login**, with one guard patrolling once a day. A login alone cannot tell us *who* patrolled, so:
-- At **Personal → Start shift** the guard must type their **full name** (required) and, optionally, an **employee / ID number**. The field is never prefilled, so yesterday's name cannot carry over by accident.
-- The name is stored on the shift (`shifts.on_duty_name`, `on_duty_ref`) by `start_shift_as()`. **It cannot be changed afterwards** from the app; pressing Start again keeps the first name.
+- On the Work tab (app) or `/guard` page (web) the guard **taps their name** from the guard list the supervisor keeps under Night patrol. Nothing is prefilled, so yesterday's name cannot carry over by accident, and the server refuses any name not on the list.
+- `start_patrol_now()` starts the patrol on the **server clock**, reuses the shift the nightly schedule prepared (or creates one), and stores the name on the shift (`shifts.on_duty_name`). **It cannot be changed afterwards** from the app; pressing Start again keeps the first name.
 - Every scan, alarm, SOS, incident, the live map and the reports show this name. Records from before this change fall back to the login's name.
 - **Reports → daily patrol log** lists one row per day: date, guard on duty, ID, route, visited / due, on time, incidents and SOS. It is also in the PDF.
 - Limit to be aware of: the name is typed, not verified. A supervisor should check it against the duty roster. For stronger proof, give each guard their own login later; the system already supports that.
@@ -115,7 +115,7 @@ Muscat Bay security uses **one shared login**, with one guard patrolling once a 
   - **iOS** shows the blue location indicator.
 - Points are recorded about once a minute, or every 25 m moved. They go to the outbox first, then upload in batches.
 - If the phone restarts during a shift, tracking resumes the next time the app opens.
-- Google Play requires an in-app explanation **before** the background permission prompt. The app shows it when the guard taps Start shift.
+- Google Play requires an in-app explanation **before** the background permission prompt. The app shows it when the guard taps Start patrol.
 
 ## 2.7 Statistics (identical everywhere)
 `patrol_stats()` is one server function, used by the guard's Statistic tab, the portal and the monthly PDF, so the numbers always agree.

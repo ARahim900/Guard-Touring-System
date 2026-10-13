@@ -1,9 +1,11 @@
 // =============================================================================
 // The guard's current shift and its checkpoints, shared by all tabs.
 // =============================================================================
-// "Current shift" = the active one if any; otherwise the next scheduled shift
-// that has not yet ended. Data is cached on the phone, and checkpoints scanned
-// offline are ticked off locally ("Pending upload") until the server confirms.
+// "Current shift" = the guard's active patrol, or none. A patrol is started on
+// demand (start_patrol_now), the same as the web guard page; the server reuses
+// any shift the supervisor's nightly schedule prepared. Data is cached on the
+// phone, and checkpoints scanned offline are ticked off locally ("Pending
+// upload") until the server confirms.
 // =============================================================================
 import * as Location from 'expo-location';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -27,6 +29,8 @@ export interface CheckpointView extends ShiftCheckpoint {
 interface ShiftContextValue {
   shift: Shift | null;
   checkpoints: CheckpointView[];
+  /** Names the supervisor listed under Night patrol; the guard picks one. */
+  guardNames: string[];
   loading: boolean;
   refreshing: boolean;
   error: string | null;
@@ -36,8 +40,8 @@ interface ShiftContextValue {
   refresh: () => Promise<void>;
   /** Re-read the local outbox (call after saving a scan). */
   reloadLocal: () => Promise<void>;
-  /** Start the shift and record who is on duty (the login is shared). */
-  startShift: (onDutyName: string, onDutyRef?: string) => Promise<{ ok: boolean; message: string }>;
+  /** Start a patrol now and record who is on duty (the login is shared). */
+  startShift: (onDutyName: string) => Promise<{ ok: boolean; message: string }>;
   endShift: () => Promise<{ ok: boolean; message: string }>;
 }
 
@@ -46,22 +50,29 @@ const ShiftContext = createContext<ShiftContextValue | null>(null);
 interface Snapshot {
   shift: Shift | null;
   checkpoints: ShiftCheckpoint[];
+  guardNames: string[];
 }
 
 async function fetchSnapshot(guardId: string): Promise<Snapshot> {
+  // Closes an expired patrol and prepares tonight's, as the web guard page does.
+  const { error: prepError } = await supabase.rpc('prepare_my_patrol');
+  if (prepError) throw prepError;
+  const { data: settings, error: settingsError } = await supabase
+    .from('app_settings').select('guard_names').eq('id', 1).single<{ guard_names: string[] }>();
+  if (settingsError) throw settingsError;
+  const guardNames = settings.guard_names ?? [];
+
   const { data: shifts, error } = await supabase
     .from('shifts')
     .select('id, guard_id, route_id, scheduled_start, scheduled_end, actual_start, actual_end, auto_closed_at, status, notes, on_duty_name, on_duty_ref, routes(name)')
     .eq('guard_id', guardId)
-    .in('status', ['active', 'scheduled'])
-    .gte('scheduled_end', new Date(Date.now() - 2 * 3600 * 1000).toISOString())
+    .eq('status', 'active')
     .order('scheduled_start', { ascending: true })
-    .limit(5).returns<Shift[]>();
+    .limit(1).returns<Shift[]>();
   if (error) throw error;
 
-  const list = (shifts ?? []) as Shift[];
-  const shift = list.find((s) => s.status === 'active') ?? list[0] ?? null;
-  if (!shift) return { shift: null, checkpoints: [] };
+  const shift = shifts?.[0] ?? null;
+  if (!shift) return { shift: null, checkpoints: [], guardNames };
 
   const { data: cps, error: cpError } = await supabase
     .from('shift_checkpoint_status')
@@ -69,14 +80,14 @@ async function fetchSnapshot(guardId: string): Promise<Snapshot> {
     .eq('shift_id', shift.id)
     .order('sequence', { ascending: true });
   if (cpError) throw cpError;
-  return { shift, checkpoints: (cps ?? []) as ShiftCheckpoint[] };
+  return { shift, checkpoints: (cps ?? []) as ShiftCheckpoint[], guardNames };
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const guardId = session?.user.id ?? null;
 
-  const [snapshot, setSnapshot] = useState<Snapshot>({ shift: null, checkpoints: [] });
+  const [snapshot, setSnapshot] = useState<Snapshot>({ shift: null, checkpoints: [], guardNames: [] });
   const [local, setLocal] = useState<Map<string, unknown>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -105,7 +116,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       const cached = await readCache<Snapshot>(`shift.${guardId}`);
       if (cached) {
-        setSnapshot(cached.value);
+        setSnapshot({ ...cached.value, guardNames: cached.value.guardNames ?? [] }); // saved by an older app version
         setUpdatedAt(cached.savedAt);
         setFromCache(true);
         await refreshLocal(cached.value.shift?.id);
@@ -127,7 +138,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   // Initial load + reload whenever the app returns to the foreground.
   useEffect(() => {
     // A different user signed in: never show the previous user's shift.
-    setSnapshot({ shift: null, checkpoints: [] });
+    setSnapshot({ shift: null, checkpoints: [], guardNames: [] });
     setLocal(new Map());
     if (!guardId) return;
     setLoading(true);
@@ -169,18 +180,16 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     })();
   }, [snapshot.shift, loading, fromCache]);
 
-  const startShift = useCallback(async (onDutyName: string, onDutyRef?: string) => {
-    const shift = snapshot.shift;
-    if (!shift) return { ok: false, message: 'No shift is assigned to you.' };
-    const name = onDutyName.trim();
-    if (name.length < 3) return { ok: false, message: 'Enter your full name to start the shift.' };
-    const { error: rpcError } = await supabase.rpc('start_shift_as', {
-      p_shift_id: shift.id,
-      p_on_duty_name: name,
-      p_on_duty_ref: onDutyRef?.trim() || null,
+  const startShift = useCallback(async (onDutyName: string) => {
+    if (!onDutyName) return { ok: false, message: 'Choose your name to start.' };
+    // The server records the start time and the shift end; the phone clock is not used.
+    const { data: shiftId, error: rpcError } = await supabase.rpc('start_patrol_now', {
+      p_on_duty_name: onDutyName,
+      p_end: null,
     });
     if (rpcError) return { ok: false, message: friendlyError(rpcError) };
-    const tracking = await startTracking(shift.id, guardId!).catch((e) => {
+    if (typeof shiftId !== 'string') return { ok: false, message: 'The patrol was not confirmed. Pull down to refresh, then try again.' };
+    const tracking = await startTracking(shiftId, guardId!).catch((e) => {
       reportError(e, { where: 'startTracking' });
       return { ok: false, background: false };
     });
@@ -192,7 +201,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       return { ok: true, message: 'Shift started. Allow location "All the time" so tracking continues in your pocket.' };
     }
     return { ok: true, message: 'Shift started. Have a safe patrol.' };
-  }, [snapshot.shift, load, guardId]);
+  }, [load, guardId]);
 
   const endShift = useCallback(async () => {
     const shift = snapshot.shift;
@@ -224,6 +233,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     () => ({
       shift: snapshot.shift,
       checkpoints,
+      guardNames: snapshot.guardNames,
       loading,
       refreshing,
       error,
@@ -234,7 +244,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       startShift,
       endShift,
     }),
-    [snapshot.shift, checkpoints, loading, refreshing, error, fromCache, updatedAt, refresh, reloadLocal, startShift, endShift],
+    [snapshot.shift, snapshot.guardNames, checkpoints, loading, refreshing, error, fromCache, updatedAt, refresh, reloadLocal, startShift, endShift],
   );
 
   return <ShiftContext.Provider value={value}>{children}</ShiftContext.Provider>;

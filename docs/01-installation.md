@@ -142,7 +142,7 @@ The public privacy policy is then at `https://<your-site>/privacy`. The app stor
 
 ### 3.3 First data (in the portal, in this order)
 1. **Contractors**: add each security company.
-2. **Guards & users**: create the **one shared security login** (e.g. security@muscatbay.com, role Guard, linked to the contractor). The portal suggests a temporary password. Share it in person with the security team leader only. Each guard types their own name at Start shift.
+2. **Guards & users**: create the **one shared security login** (e.g. security@muscatbay.com, role Guard, linked to the contractor). The portal suggests a temporary password. Share it in person with the security team leader only. Each guard taps their own name from the guard list (Night patrol → Manage team) to start a patrol.
 3. **Checkpoints**: create them on site (see Part 5).
 4. **Routes**: put checkpoints in order and set "due at shift start + N min".
 5. **Schedules**: create shifts. Use "Repeat for N days" to fill a month quickly.
@@ -218,9 +218,9 @@ Scans more than the checkpoint radius (default **30 m**) away are **rejected**. 
 ### 5.3 Acceptance test (sign off each line)
 | # | Test | Expected |
 |---|---|---|
-| 1 | Guard logs in; Work tab shows today's shift and route | Checkpoints listed with due times |
-| 2 | Personal → type your full name (and ID) → Start shift; allow location "All the time" | Status "On shift"; Work tab shows "On duty: name"; portal live map shows that name within 2 min |
-| 2a | Try Start shift with the name left empty | App refuses: name required |
+| 1 | Guard logs in; Work tab shows "Who is on duty?" with the four guard names | Start patrol stays disabled until a name is tapped |
+| 2 | Tap your name → Start patrol; allow location "All the time" | Work tab shows "On duty: name" and the required locations; portal live map shows that name within 2 min |
+| 2a | Turn on airplane mode before starting | Start patrol is disabled with "Starting a patrol needs mobile data or Wi-Fi" |
 | 3 | Scan QR at a checkpoint → Normal → Save | Toast "saved"; Work tab ticks it; portal Scan records shows **Valid** |
 | 4 | Scan the same label 100 m away | Saved, but portal shows **Rejected – too far** and an alarm |
 | 5 | Airplane mode → scan 2 checkpoints with photos | "Saved offline" and "Pending upload"; turn data on → uploads automatically |

@@ -2,7 +2,7 @@
 // WORK tab: today's shift, the assigned route, and each checkpoint's status.
 // =============================================================================
 import { router } from 'expo-router';
-import { CalendarClock, CheckCircle2, Circle, CloudUpload, MapPin, XCircle } from 'lucide-react-native';
+import { CheckCircle2, Circle, CloudUpload, MapPin, XCircle } from 'lucide-react-native';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ShiftControls } from '@/components/ShiftControls';
@@ -63,13 +63,7 @@ export default function WorkScreen() {
       {error && !fromCache ? <AppText variant="label" style={{ color: colors.dangerText }}>{error}</AppText> : null}
 
       {!shift ? (
-        <Card>
-          <EmptyState
-            icon={CalendarClock}
-            title="No shift assigned"
-            message="You have no shift today. Pull down to refresh, or contact your supervisor."
-          />
-        </Card>
+        <ShiftControls />
       ) : (
         <>
           <Card>

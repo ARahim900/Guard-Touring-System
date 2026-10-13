@@ -10,13 +10,15 @@ Tick every line before submitting. Items already handled in the code are marked 
   - `apps/guard/src/app/privacy.tsx`
   - `apps/portal/src/pages/Privacy.tsx`
 - ☐ Deploy the portal so the privacy policy has a public URL: `https://<portal>/privacy`.
-- ☐ Create a **reviewer test account**: a guard with a shift scheduled every day during review, plus one QR label (print its code) for the reviewer to scan.
+- ☐ Create a **reviewer test account**: a security login, the four guard names saved under Night patrol, and one QR label (print its code) for the reviewer to scan. The reviewer can start a patrol at any time; no shift needs scheduling.
 - ☐ Set the version in `app.config.ts` (`version`). Build numbers auto-increment (`eas.json` → `autoIncrement`).
 - ✅ Account sign-up is not offered (internal tool). Both stores accept this for **business/internal** apps. Explain it in the review notes.
 - ✅ In-app privacy policy screen (login screen and Personal tab).
 - ✅ Crash reporting (Sentry) with no personal data.
 
 ## 3.2 Apple App Store
+- ☐ Check how the Apple Developer account is enrolled. **Organisation** (needs Muscat Bay's D-U-N-S number) shows *Muscat Bay* as the seller. **Individual** shows the account holder's personal name on the App Store page; it cannot be changed later without transferring the app.
+- ☐ Pilot through **TestFlight** first (no App Review for internal testers; each build lasts 90 days), then request **Unlisted** distribution. Apple often rejects login-only internal tools from the public listing.
 - ✅ Permission texts (Info.plist) explain each use:
   - location when in use
   - location always
@@ -36,7 +38,7 @@ Tick every line before submitting. Items already handled in the code are marked 
   - **Crash Data**: App Functionality. Not linked to user.
   - **Tracking**: No.
 - ☐ Review notes. Paste and adapt:
-  > Internal tool for licensed security guards at Muscat Bay, Oman. Accounts are issued by the employer; there is no public sign-up. Test login: [email] / [password]. A shift is scheduled daily. Scan the attached QR code (or any checkpoint label) to test. Background location is used only while a shift is active, to show supervisors patrol progress and to locate a guard after an SOS; it stops when the shift ends.
+  > Internal tool for licensed security guards at Muscat Bay, Oman. Accounts are issued by the employer; there is no public sign-up. Test login: [email] / [password]. On the Work tab, tap any name under "Who is on duty?", then Start patrol. Scan the attached QR code (or any checkpoint label) to test. Background location is used only while a shift is active, to show supervisors patrol progress and to locate a guard after an SOS; it stops when the shift ends.
 - ☐ Consider **Unlisted** distribution (only people with the link can find it) or **Apple Business Manager** custom-app distribution. This suits an internal tool.
 - ☐ Screenshots for 6.9" and 6.5" iPhones: Work, Scan, Report, Histories, Statistic.
 
@@ -46,7 +48,7 @@ Tick every line before submitting. Items already handled in the code are marked 
   - `FOREGROUND_SERVICE_LOCATION`
   - `CAMERA`, `RECORD_AUDIO`, `NFC`
 - ✅ Unused storage and media-playback service permissions are blocked.
-- ✅ **Prominent disclosure** is shown before the background-location prompt (Personal → Start shift).
+- ✅ **Prominent disclosure** is shown before the background-location prompt (Work tab → Start patrol).
 - ✅ Foreground-service notification while tracking.
 - ☐ Play Console → **App content**:
   - **Privacy policy**: the public URL.
