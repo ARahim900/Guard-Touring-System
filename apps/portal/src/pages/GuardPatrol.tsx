@@ -1,14 +1,16 @@
-import { CheckCircle2, MapPin, RefreshCw, ScanLine } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { CheckCircle2, MapPin, RefreshCw, ScanLine, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { InstallPatrol } from '@/components/InstallPatrol';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
+import { ScanResult } from '@/components/ScanResult';
+import { scanFeedback } from '@/lib/scanFeedback';
 import { PatrolScanner } from '@/components/PatrolScanner';
 import { Button, ErrorNote, Spinner } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { captureLocation } from '@/lib/guardPatrol';
-import { readReceipts, saveReceipt } from '@/lib/guardOutbox';
+import { readReceipts, saveReceipt, type PatrolReceipt } from '@/lib/guardOutbox';
 import { formatDateTime, formatTime } from '@/lib/time';
 import { useGuardPatrol } from '@/lib/useGuardPatrol';
 
@@ -17,7 +19,9 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
   const { snapshot, receipts, loading, syncing, cached, error, refresh } = useGuardPatrol(userId);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const errorPanel = useRef<HTMLDivElement>(null);
   const scanInProgress = useRef(false);
+  const [latestAttempt, setLatestAttempt] = useState<PatrolReceipt | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const shift = snapshot?.shift;
@@ -26,12 +30,24 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
   const complete = checkpoints.filter((checkpoint) => checkpoint.completed).length;
   const inWindow = shift && Date.now() >= Date.parse(shift.scheduled_start) && Date.now() <= Date.parse(shift.scheduled_end);
 
+  const result = latestAttempt ? receipts.find((item) => item.id === latestAttempt.id) ?? latestAttempt
+    : receipts.find((item) => item.shiftId === shift?.id) ?? null;
+
+  useEffect(() => {
+    if (actionError) { errorPanel.current?.focus({ preventScroll: true }); errorPanel.current?.scrollIntoView({ block: 'nearest' }); }
+  }, [actionError]);
+
+  function openScanner() {
+    setActionError(null); setNotice(null); setScanning(true);
+  }
+
   async function record(code: string, method: 'qr' | 'barcode') {
     if (scanInProgress.current) return;
     scanInProgress.current = true;
     setScanning(false);
     setBusy(true);
     setActionError(null);
+    setLatestAttempt(null);
     setNotice('Label read. Capturing your GPS position…');
     const deviceTime = new Date().toISOString();
     try {
@@ -43,15 +59,16 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
         setNotice('This location already has a pending scan. Tap Retry upload.'); return;
       }
       const position = await captureLocation();
-      await saveReceipt({
+      const receipt: PatrolReceipt = {
         id: crypto.randomUUID(), userId, shiftId: shift.id, checkpointId: checkpoint.checkpoint_id,
         checkpointName: checkpoint.checkpoint_name, code, method, deviceTime,
         latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, state: 'pending',
-      });
-      setNotice(`${checkpoint.checkpoint_name}: saved on this phone. Uploading for verification…`);
-      await refresh();
-      setNotice('Scan saved. Check the result below.');
-    } catch (cause) { setNotice(null); setActionError(friendlyError(cause)); }
+      };
+      await saveReceipt(receipt);
+      setLatestAttempt(receipt);
+      setNotice(null);
+      await refresh(true);
+    } catch (cause) { setNotice(null); setActionError(`Scan not recorded. ${friendlyError(cause)}`); }
     finally { setBusy(false); scanInProgress.current = false; }
   }
 
@@ -69,19 +86,21 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
         <p className="font-medium">{fullName}</p>
         <Button variant="ghost" disabled={busy || scanning} onClick={() => void leave()}>Sign out</Button>
       </div>
-      <ErrorNote message={actionError ?? error} />
+      <div ref={errorPanel} tabIndex={-1}><ErrorNote message={actionError ?? (error === result?.error ? null : error)} /></div>
       {cached ? <p role="status" className="text-sm">Using the last saved patrol. Reconnect to check for changes.</p> : null}
+      {result && !notice && !scanning && !actionError ? <ScanResult receipt={result} announce={latestAttempt !== null} disabled={busy || syncing || (result.state !== 'pending' && !inWindow)} onRetry={() => result.state === 'pending' ? void refresh(true) : openScanner()} /> : null}
       {notice ? <p role="status" className="rounded-md bg-secondary-light p-4 text-primary">{notice}</p> : null}
-      {pending.length || error ? <Button variant="outline" icon={RefreshCw} loading={syncing} disabled={busy || scanning} onClick={() => void refresh()}>{pending.length ? 'Retry upload' : 'Try again'}</Button> : null}
+      {(pending.length || error) && result?.state !== 'pending' ? <Button variant="outline" icon={RefreshCw} loading={syncing} disabled={busy || scanning} onClick={() => void refresh(true)}>{pending.length ? 'Retry upload' : 'Try again'}</Button> : null}
       {pending.length ? <p className="text-sm">{pending.length} scan(s) are saved on this phone but not confirmed by Supabase. Keep this app open with internet access to upload. Do not clear this site's data.</p> : null}
-      {shift?.status !== 'active' ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} startTime={snapshot?.startTime ?? null} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(); setScanning(true); }} /> : (
+      {shift?.status !== 'active' ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(true); }} /> : (
         <section className="space-y-4 rounded-xl border border-border bg-card p-5">
           <h2 className="text-xl">Night patrol</h2>
           <p className="text-sm">{formatDateTime(shift.scheduled_start)} – {formatDateTime(shift.scheduled_end)} · Muscat time</p>
           <div className="rounded-lg bg-secondary-light p-4"><p className="text-2xl font-semibold text-primary">{complete}<span className="text-base font-normal"> / {checkpoints.length} locations</span></p><p className="mt-1 text-sm text-primary">{complete === checkpoints.length && checkpoints.length > 0 ? 'All locations verified for this shift' : 'Scan each location once to complete your round'}</p></div>
+          <p className="text-sm text-muted-foreground">Scan and upload times are recorded automatically.</p>
           <p className="text-sm">On duty: {shift.on_duty_name ?? fullName}</p>
-          {!scanning ? <Button className="min-h-14 w-full text-base" icon={ScanLine} loading={busy} disabled={syncing || !inWindow || checkpoints.length === 0} onClick={() => { setActionError(null); setNotice(null); setScanning(true); }}>Scan location</Button> : null}
-          {!inWindow ? <p className="text-sm">This shift has ended. Refresh to choose your next shift hours.</p> : null}
+          {!scanning ? <Button className="min-h-14 w-full text-base" icon={ScanLine} loading={busy} disabled={syncing || !inWindow || checkpoints.length === 0} onClick={openScanner}>Scan location</Button> : null}
+          {!inWindow ? <p className="text-sm">This shift has ended. Refresh to start your next patrol.</p> : null}
         </section>
       )}
           {scanning && shift?.status === 'active' ? <PatrolScanner onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
@@ -94,14 +113,17 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
                 const label = checkpoint.completed ? `Verified · ${formatTime(checkpoint.scanned_at ?? '')}` : waiting ? 'Pending upload'
                   : checkpoint.validation === 'flagged' ? 'Awaiting supervisor review' : checkpoint.validation === 'rejected' ? 'Rejected — scan again at the location' : shift?.status === 'active' ? 'Not yet visited' : 'Ready to scan when you start';
                 return <li key={checkpoint.checkpoint_id} className="flex items-center gap-3 py-4">
-                  {checkpoint.completed ? <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" /> : <MapPin className="size-5 shrink-0 text-primary" aria-hidden="true" />}
-                  <div className="min-w-0 flex-1"><p className="font-medium">{checkpoint.sequence}. {checkpoint.checkpoint_name}</p><p className="text-sm text-muted-foreground">{label}</p></div>
+                  {checkpoint.completed ? <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" /> : checkpoint.validation === 'rejected' ? <XCircle className="size-6 shrink-0 text-danger-text" aria-hidden="true" /> : <MapPin className="size-5 shrink-0 text-primary" aria-hidden="true" />}
+                  <div className="min-w-0 flex-1"><p className="font-medium">{checkpoint.sequence}. {checkpoint.checkpoint_name}</p><p className={`text-sm ${checkpoint.validation === 'rejected' && !checkpoint.completed ? 'font-medium text-danger-text' : 'text-muted-foreground'}`}>{label}</p></div>
                   <a className="shrink-0 py-3 text-sm text-primary underline" aria-label={`Directions to ${checkpoint.checkpoint_name}`} target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${checkpoint.latitude},${checkpoint.longitude}`}>Directions</a>
                 </li>;
               })}
             </ul>
           </section>
-      {receipts.length ? <details className="border-t border-border pt-4"><summary className="cursor-pointer font-semibold">Recent scans on this phone</summary><ul className="mt-3 divide-y divide-border">{receipts.slice(0, 20).map((receipt) => <li key={receipt.id} className="space-y-1 py-3 text-sm"><p className="font-medium">{receipt.checkpointName}</p><p>{formatDateTime(receipt.deviceTime)} · {receipt.state === 'pending' ? 'Pending upload' : receipt.validation === 'valid' ? 'Verified' : receipt.validation === 'flagged' ? 'Awaiting review' : 'Rejected'}</p>{receipt.error ? <p>{receipt.error}</p> : null}{receipt.flags?.length ? <p>Checks: {receipt.flags.map((flag) => flag.replaceAll('_', ' ')).join(', ')}</p> : null}</li>)}</ul></details> : null}
+      {receipts.length ? <section className="border-t border-border pt-4"><h2 className="text-lg">Recent scans</h2><p className="mt-1 text-sm text-muted-foreground">Recorded automatically on this phone · Muscat time</p><ul className="mt-3 divide-y divide-border">{receipts.slice(0, 5).map((receipt) => {
+        const feedback = scanFeedback(receipt);
+        return <li key={receipt.id} className="space-y-2 py-4 text-sm"><div className="flex justify-between gap-3"><p className="font-medium">{receipt.checkpointName}</p><p>{formatTime(receipt.deviceTime)}</p></div><p className={feedback.tone === 'danger' ? 'font-semibold text-danger-text' : 'font-medium'}>{feedback.title}</p>{feedback.tone !== 'success' ? <p>{feedback.message}</p> : null}<p className="text-muted-foreground">{formatDateTime(receipt.deviceTime)}</p></li>;
+      })}</ul></section> : null}
     </div>
   );
 }

@@ -212,3 +212,39 @@ test('self-service reuses an unstarted automatic shift and remains isolated from
   assert.notEqual(id,otherId);
   assert.equal((await db.query('select id from public.shifts where id=$1',[id])).rows.length,0);
 });
+
+test('start now uses the server time, defaults to twelve hours and safely resumes',async()=>{
+  await rosterOnly();
+  await clock('2027-01-01T00:15:37+04:00');
+  const id=(await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id;
+  const row=(await db.query('select scheduled_start,scheduled_end,actual_start from public.shifts where id=$1',[id])).rows[0];
+  assert.equal(new Date(row.scheduled_start).toISOString(),'2026-12-31T20:15:37.000Z');
+  assert.equal(new Date(row.actual_start).toISOString(),'2026-12-31T20:15:37.000Z');
+  assert.equal(new Date(row.scheduled_end).toISOString(),'2027-01-01T08:15:37.000Z');
+  await clock('2027-01-01T00:20:00+04:00');
+  assert.equal((await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id,id);
+  assert.equal((await db.query('select count(*)::int as n from public.shifts')).rows[0].n,1);
+});
+
+test('start now honours a configured end and a guard-selected end across midnight',async()=>{
+  await setup();await asUser(guard);
+  const id=(await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id;
+  const row=(await db.query('select scheduled_start,scheduled_end from public.shifts where id=$1',[id])).rows[0];
+  assert.equal(new Date(row.scheduled_start).toISOString(),'2026-12-31T18:00:00.000Z');
+  assert.equal(new Date(row.scheduled_end).toISOString(),'2027-01-01T02:00:00.000Z');
+  await asUser(other);
+  const otherId=(await db.query("select public.start_patrol_now('Sample two','05:30') as id")).rows[0].id;
+  const otherRow=(await db.query('select scheduled_end from public.shifts where id=$1',[otherId])).rows[0];
+  assert.equal(new Date(otherRow.scheduled_end).toISOString(),'2027-01-01T01:30:00.000Z');
+});
+
+test('start now retains guard-name, account-role and inactive-account checks',async()=>{
+  await rosterOnly();
+  await assert.rejects(db.query("select public.start_patrol_now('Unknown')"),/guard list/);
+  await asUser(staff);
+  await assert.rejects(db.query("select public.start_patrol_now('Sample guard')"),/active security/);
+  await asUser(null);await db.query('update public.profiles set active=false where id=$1',[guard]);await asUser(guard);
+  await assert.rejects(db.query("select public.start_patrol_now('Sample guard')"),/active security/);
+  await asUser(null);await db.exec('set role anon');
+  await assert.rejects(db.query("select public.start_patrol_now('Sample guard')"),/permission denied/);
+});

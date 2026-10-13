@@ -28,16 +28,17 @@ export function useGuardPatrol(userId: string) {
     } finally { setLoading(false); }
   }, [userId]);
 
-  const refresh = useCallback((): Promise<void> => {
-    if (running.current) return running.current;
+  const refresh = useCallback((afterCurrent = false): Promise<void> => {
+    // A scan saved during a background upload needs its own pass after that upload.
+    if (running.current) return afterCurrent ? running.current.then(() => refresh()) : running.current;
     const task = (async () => {
       setSyncing(true);
       let uploadError: string | null = null;
       try { await uploadReceipts(userId, submitReceipt); }
       catch (cause) { uploadError = friendlyError(cause); }
-      await load();
       try { setReceipts(await readReceipts(userId)); }
       catch { uploadError = 'Phone storage is unavailable. Scans cannot be saved safely.'; }
+      await load();
       if (uploadError) setError(uploadError);
       setSyncing(false);
     })().finally(() => { running.current = null; });

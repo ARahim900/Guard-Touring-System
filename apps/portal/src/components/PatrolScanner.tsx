@@ -51,8 +51,8 @@ export function PatrolScanner({ onScan, onClose }: {
   return (
     <section aria-label="Camera scanner" className="space-y-3 rounded-lg border border-border bg-white p-4">
       <h2 className="text-lg">Scan the label at this location</h2>
-      <video ref={video} autoPlay muted playsInline className="aspect-square w-full rounded-md bg-primary object-cover" aria-label="Live camera preview" />
-      <p role={error ? 'alert' : 'status'} className="text-sm">{error ?? (ready ? 'Point the camera at the QR code or barcode. The visit saves automatically.' : 'Opening camera…')}</p>
+      <video ref={video} autoPlay muted playsInline className={`aspect-square w-full rounded-md bg-primary object-cover ${error ? 'hidden' : ''}`} aria-label="Live camera preview" />
+      <p role={error ? 'alert' : 'status'} className={error ? 'rounded-lg border border-danger bg-danger-bg p-4 text-base text-danger-text' : 'text-sm'}>{error ?? (ready ? 'Point the camera at the QR code or barcode. Time and GPS are captured automatically. Wait for the verification result.' : 'Opening camera…')}</p>
       <Button className="min-h-11 w-full" variant="outline" onClick={onClose}>Close camera</Button>
     </section>
   );
