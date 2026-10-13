@@ -1,14 +1,22 @@
 import { NavLink, Outlet } from 'react-router';
+import { useAlarms } from '@/context/AlarmContext';
 import { useAuth } from '@/context/AuthContext';
 
 const pages = [
   { to: '/', label: 'Night patrol' },
+  { to: '/alarms', label: 'Alarms' },
+  { to: '/live', label: 'Live map' },
+  { to: '/incidents', label: 'Incidents' },
+  { to: '/scans', label: 'Scans' },
   { to: '/checkpoints', label: 'Locations' },
   { to: '/reports', label: 'Reports' },
 ];
 
 export function Layout() {
   const { profile, signOut } = useAuth();
+  const { openCount } = useAlarms();
+  // The open-alarm count is shown as text, so it does not rely on colour.
+  const label = (page: (typeof pages)[number]) => page.to === '/alarms' && openCount ? `${page.label} (${openCount} open)` : page.label;
   return (
     <div className="flex min-h-full flex-col bg-background">
       <header className="bg-primary px-4 py-4 text-white sm:px-6">
@@ -23,8 +31,8 @@ export function Layout() {
         </div>
       </header>
       <nav aria-label="Main navigation" className="border-b border-border bg-white px-3">
-        <div className="mx-auto flex max-w-5xl gap-2">
-          {pages.map((page) => <NavLink key={page.to} to={page.to} end={page.to === '/'} className={({ isActive }) => `min-h-12 border-b-2 px-3 py-3 text-sm font-semibold ${isActive ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}>{page.label}</NavLink>)}
+        <div className="mx-auto flex max-w-5xl gap-2 overflow-x-auto">
+          {pages.map((page) => <NavLink key={page.to} to={page.to} end={page.to === '/'} className={({ isActive }) => `min-h-12 shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold ${isActive ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}>{label(page)}</NavLink>)}
         </div>
       </nav>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6"><Outlet /></main>

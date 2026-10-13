@@ -85,6 +85,46 @@ export function reportTotals(report: PatrolReport) {
   };
 }
 
+export type NightStatus = 'Completed' | 'Incomplete' | 'In progress' | 'Not started' | 'Missed' | 'No patrol recorded' | 'Cancelled' | 'Upcoming';
+export interface NightRow {
+  date: string;
+  status: NightStatus;
+  verified: number;
+  required: number;
+  guards: string[];
+}
+/** Nights that need a supervisor's explanation. */
+export const NIGHTS_NEEDING_ATTENTION: NightStatus[] = ['No patrol recorded', 'Missed', 'Incomplete'];
+
+const muscatDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Muscat', year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/**
+ * One row for EVERY night in the range, including nights with no shift record
+ * at all. A patrol that was never started and never scheduled leaves no record,
+ * so it can only be found by listing the nights that were expected.
+ */
+export function nightRows(report: PatrolReport): NightRow[] {
+  const now = new Date(report.generated_at);
+  const today = muscatDay.format(now);
+  const nights: NightRow[] = [];
+  for (let day = new Date(`${report.from_date}T00:00:00Z`); day <= new Date(`${report.to_date}T00:00:00Z`); day.setUTCDate(day.getUTCDate() + 1)) {
+    const date = day.toISOString().slice(0, 10);
+    const shifts = report.shifts.filter((s) => s.patrol_date === date);
+    const live = shifts.filter((s) => s.status !== 'cancelled');
+    const required = new Set(live.flatMap((s) => s.checkpoints.map((c) => c.id)));
+    const verified = new Set(live.flatMap((s) => s.checkpoints.filter((c) => c.scans.some((x) => x.validation === 'valid')).map((c) => c.id)));
+    const started = live.some((s) => s.actual_start !== null || s.status === 'active' || s.status === 'completed');
+    const status: NightStatus =
+      !live.length ? (shifts.length ? 'Cancelled' : date > today ? 'Upcoming' : date === today ? 'Not started' : 'No patrol recorded')
+      : live.some((s) => s.status === 'active') ? 'In progress'
+      : started ? (required.size > 0 && verified.size === required.size ? 'Completed' : 'Incomplete')
+      : live.some((s) => s.status === 'scheduled' && new Date(s.scheduled_end) > now) ? 'Not started'
+      : 'Missed';
+    nights.push({ date, status, verified: verified.size, required: required.size, guards: [...new Set(live.map((s) => s.guard_name ?? 'Unconfirmed'))] });
+  }
+  return nights;
+}
+
 const timestampFormatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Muscat', year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
@@ -93,7 +133,8 @@ export const evidenceTime = (value: string | null) => value ? timestampFormatter
 export const coordinates = (s: ReportScan | null) => s?.latitude !== null && s?.latitude !== undefined && s.longitude !== null
   ? `${s.latitude.toFixed(6)}, ${s.longitude.toFixed(6)}` : 'Unknown';
 
-function csvCell(value: string | number | null): string {
+/** Quote a CSV cell and stop Excel treating text such as "=..." as a formula. */
+export function csvCell(value: string | number | null): string {
   const raw = value === null ? '' : String(value);
   const safe = typeof value === 'string' && /^[\s]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
   return `"${safe.replaceAll('"', '""')}"`;

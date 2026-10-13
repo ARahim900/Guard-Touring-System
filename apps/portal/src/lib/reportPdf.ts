@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 
-import { coordinates, evidenceTime, reportTotals, visitRows, type PatrolReport } from './patrolReport';
+import { NIGHTS_NEEDING_ATTENTION, coordinates, evidenceTime, nightRows, reportTotals, visitRows, type PatrolReport } from './patrolReport';
 
 const PRIMARY: [number, number, number] = [78, 68, 86];
 const TEAL: [number, number, number] = [164, 197, 187];
@@ -9,6 +9,8 @@ const TEAL: [number, number, number] = [164, 197, 187];
 export function buildReportPdf(report: PatrolReport): jsPDF {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const totals = reportTotals(report);
+  const nights = nightRows(report);
+  const attention = nights.filter((n) => NIGHTS_NEEDING_ATTENTION.includes(n.status)).length;
   const width = doc.internal.pageSize.getWidth();
   doc.setFillColor(...PRIMARY);
   doc.rect(0, 0, width, 25, 'F');
@@ -21,9 +23,19 @@ export function buildReportPdf(report: PatrolReport): jsPDF {
   doc.setFontSize(10);
   doc.text(`Required: ${totals.required}   Verified: ${totals.verified}   Awaiting review: ${totals.review}   Rejected: ${totals.rejected}   Unvisited: ${totals.unvisited}`, 14, 34);
   doc.text('One verified visit per checkpoint per shift. Pending phone uploads are not visible until received.', 14, 41);
-  doc.text(`Not yet visited (shift still open): ${totals.remaining} | Missing attachments: ${totals.missingAttachments}`, 14, 48);
+  doc.text(`Not yet visited (shift still open): ${totals.remaining} | Missing attachments: ${totals.missingAttachments} | Nights needing explanation: ${attention} of ${nights.length}`, 14, 48);
   autoTable(doc, {
     startY: 55,
+    head: [['Night of', 'Result', 'Verified / required', 'Guard on duty']],
+    body: nights.map((n) => [n.date, n.status, n.required ? `${n.verified} / ${n.required}` : '-', n.guards.join(', ') || '-']),
+    styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: PRIMARY },
+    margin: { bottom: 20 },
+  });
+  doc.addPage();
+  doc.setFontSize(13);
+  doc.text('Shift log', 14, 14);
+  autoTable(doc, {
+    startY: 20,
     head: [['Shift date', 'Guard on duty / login', 'Route', 'Status', 'Scheduled start / end', 'Actual start / end']],
     body: report.shifts.map((s) => [s.patrol_date, `${s.guard_name ?? 'Unconfirmed'} / ${s.login_name}`, s.route_name,
       s.auto_closed_at ? 'Auto-closed; finish unconfirmed' : s.status,

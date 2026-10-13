@@ -64,6 +64,8 @@ Patrolling_Tour_System/
 
 ## What has been tested
 
+Every push and pull request runs the automated checks in `.github/workflows/ci.yml`: database and report tests, portal type-check, build and dependency audit, and the guard app type-check. Database changes are made only through `supabase/migrations/`; apply them in order and never paste older SQL over a newer function.
+
 - All five SQL migrations were applied to a local PostgreSQL server and tested:
   - RLS isolation: one guard cannot see another guard's data.
   - A guard cannot promote themselves to admin.

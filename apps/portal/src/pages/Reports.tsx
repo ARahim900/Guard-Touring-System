@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { ScanDetail } from '@/components/ScanDetail';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, StatCard, Table, Td } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
-import { buildReportCsv, coordinates, evidenceTime, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
+import { NIGHTS_NEEDING_ATTENTION, buildReportCsv, coordinates, evidenceTime, nightRows, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
 import { buildReportPdf } from '@/lib/reportPdf';
 import { supabase } from '@/lib/supabase';
 import { dayKey } from '@/lib/time';
@@ -64,6 +64,8 @@ export default function ReportsPage() {
 
   const rows = report ? visitRows(report) : [];
   const totals = report ? reportTotals(report) : null;
+  const nights = report ? nightRows(report) : [];
+  const attention = nights.filter((n) => NIGHTS_NEEDING_ATTENTION.includes(n.status)).length;
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
 
   return (
@@ -94,6 +96,19 @@ export default function ReportsPage() {
             <StatCard icon={ClipboardList} label="Unvisited after shift end" value={totals.unvisited} hint={`${totals.remaining} not yet visited in open shifts`} />
             <StatCard icon={FileDown} label="Missing attachments" value={totals.missingAttachments} hint="Evidence still awaiting upload or recovery" />
           </div>
+          <Card title="Nights" className="mb-[14px]">
+            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} nights need a supervisor's explanation: no patrol recorded, missed, or not every location verified.` : 'No nights need an explanation.'}{report.contractor_name ? ` Showing ${report.contractor_name} only.` : ''}</p>
+            <Table head={['Night of', 'Result', 'Verified / required', 'Guard on duty']}>
+              {nights.map((n) => (
+                <tr key={n.date}>
+                  <Td>{n.date}</Td>
+                  <Td><Badge label={n.status} tone={n.status === 'Completed' ? 'brand' : NIGHTS_NEEDING_ATTENTION.includes(n.status) ? 'warning' : 'neutral'} /></Td>
+                  <Td>{n.required ? `${n.verified} / ${n.required}` : '–'}</Td>
+                  <Td>{n.guards.join(', ') || '–'}</Td>
+                </tr>
+              ))}
+            </Table>
+          </Card>
           <Card title="Shift log" className="mb-[14px]">
             <Table head={['Shift date', 'Guard on duty', 'Route', 'Shift status', 'Actual start / end']}>
               {report.shifts.map((s) => (

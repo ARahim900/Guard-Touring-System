@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildReportCsv, reportTotals, visitRows } from '../apps/portal/src/lib/patrolReport.ts';
+import { buildReportCsv, csvCell, nightRows, reportTotals, visitRows } from '../apps/portal/src/lib/patrolReport.ts';
 
 const scan = (id, validation = 'valid') => ({ id, device_time:'2026-09-11T01:00:00+04:00', server_time:'2026-09-11T09:00:00+04:00', effective_time:'2026-09-11T01:00:00+04:00', validation, latitude:null, longitude:null, accuracy_m:null, distance_m:null, status:'normal', note:null, flags:[], review_note:null, expected_attachments:0, attachment_count:0 });
 const shift = (overrides = {}) => ({ id:'shift-1', patrol_date:'2026-09-10', guard_name:null, guard_ref:null, login_name:'Test login', route_name:'Test route', status:'completed', scheduled_start:'2026-09-10T22:00:00+04:00', scheduled_end:'2026-09-11T06:00:00+04:00', actual_start:null, actual_end:null, auto_closed_at:'2026-09-11T06:05:00+04:00', checkpoints:[], ...overrides });
@@ -40,4 +40,34 @@ test('large report and empty routes are retained without pagination loss', () =>
   assert.equal(buildReportCsv(data).split('\r\n').length,1203);
   assert.ok(buildReportCsv(data).includes('No checkpoints configured'));
   assert.equal(reportTotals(report([])).completion,null);
+});
+
+test('every night is listed, including a night with no patrol record at all', () => {
+  const cp = (id, scans = []) => ({id,name:id,sequence:1,scans});
+  const data = {from_date:'2026-09-06',to_date:'2026-09-12',generated_at:'2026-09-11T23:00:00+04:00',shifts:[
+    shift({id:'done',patrol_date:'2026-09-06',guard_name:'Sample guard',checkpoints:[cp('a',[scan('1')])]}),
+    shift({id:'part',patrol_date:'2026-09-07',actual_start:'2026-09-07T22:00:00+04:00',checkpoints:[cp('a',[scan('2')]),cp('b')]}),
+    shift({id:'missed',patrol_date:'2026-09-08',status:'missed',auto_closed_at:null,checkpoints:[cp('a')]}),
+    shift({id:'cancel',patrol_date:'2026-09-10',status:'cancelled',checkpoints:[cp('a')]}),
+    shift({id:'live',patrol_date:'2026-09-11',status:'active',checkpoints:[cp('a')]}),
+  ]};
+  const nights = nightRows(data);
+  assert.deepEqual(nights.map((n) => [n.date, n.status]), [
+    ['2026-09-06','Completed'],['2026-09-07','Incomplete'],['2026-09-08','Missed'],
+    ['2026-09-09','No patrol recorded'],['2026-09-10','Cancelled'],['2026-09-11','In progress'],['2026-09-12','Upcoming'],
+  ]);
+  assert.equal(nights[1].verified,1);assert.equal(nights[1].required,2);
+  assert.deepEqual(nights[0].guards,['Sample guard']);
+});
+
+test('tonight without a record is not yet started, not missed', () => {
+  const data = {from_date:'2026-09-11',to_date:'2026-09-11',generated_at:'2026-09-11T19:00:00+04:00',shifts:[]};
+  assert.equal(nightRows(data)[0].status,'Not started');
+});
+
+test('scan export cells neutralise spreadsheet formulas', () => {
+  assert.equal(csvCell('=1+1'),`"'=1+1"`);
+  assert.equal(csvCell('  @SUM(A1)'),`"'  @SUM(A1)"`);
+  assert.equal(csvCell(-5),'"-5"');
+  assert.equal(csvCell('Gate "A"'),'"Gate ""A"""');
 });
