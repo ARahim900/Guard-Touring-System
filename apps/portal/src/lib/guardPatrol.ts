@@ -13,14 +13,15 @@ export interface PatrolCheckpoint {
   latitude: number;
   longitude: number;
 }
-export interface PatrolSnapshot { guardNames: string[]; shift: Shift | null; checkpoints: PatrolCheckpoint[]; updatedAt: string }
+export interface PatrolSnapshot { guardNames: string[]; startTime: string | null; endTime: string | null; shift: Shift | null; checkpoints: PatrolCheckpoint[]; updatedAt: string }
 
 export async function fetchPatrol(userId: string): Promise<PatrolSnapshot> {
   const { error: preparationError } = await supabase.rpc('prepare_my_patrol').abortSignal(AbortSignal.timeout(15000));
   if (preparationError) throw preparationError;
-  const roster = await supabase.from('app_settings').select('guard_names').eq('id', 1).single<{ guard_names: string[] }>();
+  const roster = await supabase.from('app_settings').select('guard_names, night_shift_start, night_shift_end').eq('id', 1).single<{ guard_names: string[]; night_shift_start: string | null; night_shift_end: string | null }>();
   if (roster.error) throw roster.error;
   const guardNames = roster.data.guard_names;
+  const hours = { startTime: roster.data.night_shift_start, endTime: roster.data.night_shift_end };
   const { data, error } = await supabase.from('shifts')
     .select('id, guard_id, route_id, scheduled_start, scheduled_end, actual_start, actual_end, auto_closed_at, status, notes, on_duty_name, on_duty_ref, routes(name)')
     .eq('guard_id', userId).in('status', ['active', 'scheduled'])
@@ -28,12 +29,17 @@ export async function fetchPatrol(userId: string): Promise<PatrolSnapshot> {
     .limit(100).returns<Shift[]>().abortSignal(AbortSignal.timeout(15000));
   if (error) throw error;
   const shift = data?.find((item) => item.status === 'active') ?? data?.[0] ?? null;
-  if (!shift) return { guardNames, shift: null, checkpoints: [], updatedAt: new Date().toISOString() };
+  if (!shift || shift.status !== 'active') {
+    const locations = await supabase.rpc('patrol_locations').select('id, name, code, latitude, longitude').returns<{ id: string; name: string; code: string; latitude: number; longitude: number }[]>().abortSignal(AbortSignal.timeout(15000));
+    if (locations.error) throw locations.error;
+    if (!Array.isArray(locations.data)) throw new Error('Could not load the patrol locations. Try again.');
+    return { guardNames, ...hours, shift: null, checkpoints: (locations.data ?? []).map((location, index) => ({ checkpoint_id: location.id, checkpoint_name: location.name, code: location.code, latitude: location.latitude, longitude: location.longitude, sequence: index + 1, completed: false, validation: null, scanned_at: null })), updatedAt: new Date().toISOString() };
+  }
   const checkpoints = await supabase.from('shift_checkpoint_status')
     .select('checkpoint_id, checkpoint_name, code, sequence, completed, validation, scanned_at, latitude, longitude')
     .eq('shift_id', shift.id).order('sequence').returns<PatrolCheckpoint[]>().abortSignal(AbortSignal.timeout(15000));
   if (checkpoints.error) throw checkpoints.error;
-  return { guardNames, shift, checkpoints: checkpoints.data ?? [], updatedAt: new Date().toISOString() };
+  return { guardNames, ...hours, shift, checkpoints: checkpoints.data ?? [], updatedAt: new Date().toISOString() };
 }
 
 export async function submitReceipt(receipt: PatrolReceipt): Promise<ScanVerdict> {

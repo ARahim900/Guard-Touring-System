@@ -60,13 +60,13 @@ test('one setup creates tonight and tomorrow, with required locations and no inv
   assert.equal((await nights())[0].status,'active');
 });
 
-test('only staff configure and only selected active security login prepares patrols',async()=>{
+test('only staff configure automatic patrols; other security logins can prepare their own',async()=>{
   await asUser(guard);
   await assert.rejects(db.query("select public.save_daily_patrol($1,'20:00','06:00',array['Sample guard','Sample two','Sample three','Sample four'])",[guard]),/Only supervisors/);
   await assert.rejects(db.query('select public.prepare_daily_patrols()'),/permission denied/);
   await setup();
   await asUser(other);
-  await assert.rejects(db.query('select public.prepare_my_patrol()'),/not the security login/);
+  await db.query('select public.prepare_my_patrol()');
   assert.equal((await nights()).length,0);
   await asUser(null);
   await db.query('update public.profiles set active=false where id=$1',[guard]);
@@ -141,4 +141,74 @@ test('roster refuses duplicate names and unlisted on-duty selections',async()=>{
   await assert.rejects(db.query("select public.start_shift_as($1,'Sample two',null)",[first.id]),/already started/);
   const saved=await db.query('select on_duty_name from public.shifts where id=$1',[first.id]);
   assert.equal(saved.rows[0].on_duty_name,'Sample guard');
+});
+
+async function rosterOnly() {
+  await asUser(null);
+  await db.query("update public.app_settings set guard_names=array['Sample guard','Sample two','Sample three','Sample four'] where id=1");
+  await asUser(guard);
+}
+
+test('guard starts without manager setup, sees locations, and retry preserves the same shift',async()=>{
+  await rosterOnly();
+  await db.query('select public.prepare_my_patrol()');
+  const locations=(await db.query('select id,code from public.patrol_locations()')).rows;
+  assert.equal(locations[0].id,checkpoint);
+  const first=(await db.query("select public.start_my_patrol('20:00','06:00','Sample guard') as id")).rows[0].id;
+  const again=(await db.query("select public.start_my_patrol('21:00','07:00','Sample guard') as id")).rows[0].id;
+  assert.equal(first,again);
+  const shift=(await db.query('select status,actual_start,scheduled_start,scheduled_end,on_duty_name from public.shifts where id=$1',[first])).rows[0];
+  assert.equal(shift.status,'active');
+  assert.equal(shift.on_duty_name,'Sample guard');
+  assert.equal(new Date(shift.actual_start).toISOString(),'2026-12-31T18:00:00.000Z');
+  assert.equal(new Date(shift.scheduled_start).toISOString(),'2026-12-31T16:00:00.000Z');
+  assert.equal((await db.query('select count(*)::int as n from public.shift_checkpoints where shift_id=$1',[first])).rows[0].n,1);
+  await assert.rejects(db.query("select public.start_my_patrol('20:00','06:00','Sample two')"),/already in progress/);
+});
+
+test('guard self-service handles midnight and closes expired shifts without inventing attendance',async()=>{
+  await rosterOnly();
+  await clock('2027-01-01T01:00:00+04:00');
+  const id=(await db.query("select public.start_my_patrol('20:00','06:00','Sample guard') as id")).rows[0].id;
+  const shift=(await db.query('select scheduled_start,scheduled_end from public.shifts where id=$1',[id])).rows[0];
+  assert.equal(new Date(shift.scheduled_start).toISOString(),'2026-12-31T16:00:00.000Z');
+  assert.equal(new Date(shift.scheduled_end).toISOString(),'2027-01-01T02:00:00.000Z');
+  await clock('2027-01-01T06:00:00+04:00');
+  await db.query('select public.prepare_my_patrol()');
+  const closed=(await db.query('select status,actual_end,auto_closed_at from public.shifts where id=$1',[id])).rows[0];
+  assert.equal(closed.status,'completed');assert.equal(closed.actual_end,null);assert.ok(closed.auto_closed_at);
+});
+
+test('self-service rejects invalid times, unlisted names, staff, inactive guards and anonymous callers',async()=>{
+  await rosterOnly();
+  await assert.rejects(db.query("select public.start_my_patrol('20:00','20:00','Sample guard')"),/different/);
+  await assert.rejects(db.query("select public.start_my_patrol('23:00','06:00','Sample guard')"),/current Muscat time/);
+  await assert.rejects(db.query("select public.start_my_patrol('20:00','06:00','Unknown')"),/guard list/);
+  await asUser(staff);
+  await assert.rejects(db.query("select public.start_my_patrol('20:00','06:00','Sample guard')"),/active security/);
+  await assert.rejects(db.query('select public.patrol_locations()'),/active security/);
+  await asUser(null);await db.query('update public.profiles set active=false where id=$1',[guard]);
+  await asUser(guard);
+  await assert.rejects(db.query("select public.start_my_patrol('20:00','06:00','Sample guard')"),/active security/);
+  await asUser(null);await db.exec('set role anon');
+  await assert.rejects(db.query("select public.start_my_patrol('20:00','06:00','Sample guard')"),/permission denied/);
+});
+
+test('finished patrols cannot be reset through a second overlapping shift',async()=>{
+  await rosterOnly();
+  const id=(await db.query("select public.start_my_patrol('20:00','06:00','Sample guard') as id")).rows[0].id;
+  await db.query('select public.end_shift($1)',[id]);
+  await assert.rejects(db.query("select public.start_my_patrol('21:00','07:00','Sample guard')"),/overlap a finished/);
+  assert.equal((await db.query('select count(*)::int as n from public.shifts')).rows[0].n,1);
+});
+
+test('self-service reuses an unstarted automatic shift and remains isolated from another login',async()=>{
+  await setup();await asUser(guard);
+  const id=(await db.query("select public.start_my_patrol('21:00','05:00','Sample guard') as id")).rows[0].id;
+  const rows=await nights();assert.equal(rows[0].id,id);assert.equal(rows.length,2);
+  assert.equal(new Date(rows[0].scheduled_start).toISOString(),'2026-12-31T17:00:00.000Z');
+  await asUser(other);
+  const otherId=(await db.query("select public.start_my_patrol('21:00','05:00','Sample two') as id")).rows[0].id;
+  assert.notEqual(id,otherId);
+  assert.equal((await db.query('select id from public.shifts where id=$1',[id])).rows.length,0);
 });

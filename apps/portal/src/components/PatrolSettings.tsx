@@ -66,9 +66,9 @@ export function PatrolSettings({ settings, guards, onSaved }: { settings: Patrol
   }
 
   return <section id="shift-settings" className="overflow-hidden rounded-xl border border-border bg-card">
-    <div className="flex items-center gap-3 border-b border-border p-5"><Clock3 className="size-5 text-primary" aria-hidden="true" /><div><h2 className="text-lg">Shift hours</h2><p className="mt-1 text-sm text-muted-foreground">Every night · Muscat time</p></div></div>
+    <div className="flex items-center gap-3 border-b border-border p-5"><Clock3 className="size-5 text-primary" aria-hidden="true" /><div><h2 className="text-lg">Optional default hours</h2><p className="mt-1 text-sm text-muted-foreground">Every night · Muscat time</p></div></div>
     <form className="space-y-5 p-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <p className="text-sm text-muted-foreground">Choose the start and end times below. These repeat each night until you change them.</p>
+      <p className="text-sm text-muted-foreground">Guards can start without these settings. Set default hours here only if you want patrols prepared automatically.</p>
       <div className="grid grid-cols-2 gap-3"><TimePicker label="Start time" value={start} onChange={setStart} /><TimePicker label="End time" value={end} onChange={setEnd} /></div>
       {duration !== null && duration > 0 ? <p className="text-sm text-primary">{Math.floor(duration / 60)}h {duration % 60 ? `${duration % 60}m` : ''}{end < start ? ' · ends the following morning' : ''}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted p-3"><div className="flex items-center gap-2 text-sm"><Users className="size-4 text-primary" aria-hidden="true" /><span>{namesReady ? '4 guards available in the dropdown' : 'Add your four guards'}</span></div><Button type="button" variant="ghost" onClick={() => setEditingTeam(true)}>Manage team</Button></div>

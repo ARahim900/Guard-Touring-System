@@ -2,20 +2,19 @@ import { CheckCircle2, MapPin, RefreshCw, ScanLine } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { InstallPatrol } from '@/components/InstallPatrol';
+import { GuardShiftStart } from '@/components/GuardShiftStart';
 import { PatrolScanner } from '@/components/PatrolScanner';
-import { Button, ErrorNote, Field, Select, Spinner } from '@/components/ui';
+import { Button, ErrorNote, Spinner } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { captureLocation } from '@/lib/guardPatrol';
 import { readReceipts, saveReceipt } from '@/lib/guardOutbox';
-import { supabase } from '@/lib/supabase';
 import { formatDateTime, formatTime } from '@/lib/time';
 import { useGuardPatrol } from '@/lib/useGuardPatrol';
 
 function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
   const { signOut } = useAuth();
   const { snapshot, receipts, loading, syncing, cached, error, refresh } = useGuardPatrol(userId);
-  const [name, setName] = useState('');
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const scanInProgress = useRef(false);
@@ -26,22 +25,6 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
   const pending = receipts.filter((receipt) => receipt.state === 'pending');
   const complete = checkpoints.filter((checkpoint) => checkpoint.completed).length;
   const inWindow = shift && Date.now() >= Date.parse(shift.scheduled_start) && Date.now() <= Date.parse(shift.scheduled_end);
-
-  async function startScanning() {
-    if (!shift) return;
-    setActionError(null);
-    if (name.trim().length < 3) return setActionError('Choose the guard on duty.');
-    setBusy(true);
-    try {
-      const { error: startError } = await supabase.rpc('start_shift_as', {
-        p_shift_id: shift.id, p_on_duty_name: name.trim(), p_on_duty_ref: null,
-      });
-      if (startError) throw startError;
-      await refresh();
-      setScanning(true);
-    } catch (cause) { setActionError(friendlyError(cause)); }
-    finally { setBusy(false); }
-  }
 
   async function record(code: string, method: 'qr' | 'barcode') {
     if (scanInProgress.current) return;
@@ -54,7 +37,7 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
     try {
       if (!shift || shift.status !== 'active' || !inWindow) throw new Error('Scanning is only available during your active shift.');
       const checkpoint = checkpoints.find((item) => item.code === code);
-      if (!checkpoint) throw new Error('This label is not on your assigned patrol. Check the location with your supervisor.');
+      if (!checkpoint) throw new Error('This QR code is not one of this shift’s locations.');
       if (checkpoint.completed) { setNotice(`${checkpoint.checkpoint_name} is already verified for this shift.`); return; }
       if ((await readReceipts(userId)).some((item) => item.shiftId === shift.id && item.checkpointId === checkpoint.checkpoint_id && item.state === 'pending')) {
         setNotice('This location already has a pending scan. Tap Retry upload.'); return;
@@ -91,35 +74,25 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
       {notice ? <p role="status" className="rounded-md bg-secondary-light p-4 text-primary">{notice}</p> : null}
       {pending.length || error ? <Button variant="outline" icon={RefreshCw} loading={syncing} disabled={busy || scanning} onClick={() => void refresh()}>{pending.length ? 'Retry upload' : 'Try again'}</Button> : null}
       {pending.length ? <p className="text-sm">{pending.length} scan(s) are saved on this phone but not confirmed by Supabase. Keep this app open with internet access to upload. Do not clear this site's data.</p> : null}
-      {!shift ? <div className="space-y-2 border-y border-border py-6"><h2 className="text-lg">Your patrol is not ready yet</h2><p>Your manager needs to save Night patrol setup and add the locations. After that, patrols appear automatically each night.</p></div> : (
-        <>
-          <section className="space-y-4 rounded-xl border border-border bg-card p-5">
-            <h2 className="text-xl">Night patrol</h2>
-            <p className="text-sm">{formatDateTime(shift.scheduled_start)} – {formatDateTime(shift.scheduled_end)} · Muscat time</p>
-            <div className="rounded-lg bg-secondary-light p-4"><p className="text-2xl font-semibold text-primary">{complete}<span className="text-base font-normal"> / {checkpoints.length} locations</span></p><p className="mt-1 text-sm text-primary">{complete === checkpoints.length && checkpoints.length > 0 ? 'All locations verified for this shift' : 'Scan each location once to complete your round'}</p>{checkpoints.length > 0 ? <progress aria-label="Locations verified" className="mt-3 h-2 w-full appearance-none [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary" value={complete} max={checkpoints.length} /> : null}</div>
-            {shift.status === 'scheduled' ? (
-              <div className="space-y-3">
-                <Field label="Guard on duty"><Select className="min-h-12 text-base" value={name} onChange={(event) => setName(event.target.value)}><option value="">Choose your name</option>{snapshot?.guardNames?.map((guard) => <option key={guard} value={guard}>{guard}</option>)}</Select></Field>
-                {!inWindow ? <p className="text-sm">Scanning opens at {formatTime(shift.scheduled_start)}. Your patrol is already prepared.</p> : null}
-                <Button className="min-h-12 w-full" loading={busy} icon={ScanLine} disabled={syncing || !inWindow || !name} onClick={() => void startScanning()}>Start scanning</Button>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm">On duty: {shift.on_duty_name ?? fullName}</p>
-                {!scanning ? <Button className="min-h-14 w-full text-base" icon={ScanLine} loading={busy} disabled={syncing || !inWindow || checkpoints.length === 0} onClick={() => { setActionError(null); setNotice(null); setScanning(true); }}>Scan location</Button> : null}
-                {!inWindow ? <p className="text-sm">Scanning is available between the scheduled start and end times.</p> : null}
-              </>
-            )}
-          </section>
-          {scanning ? <PatrolScanner onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
+      {shift?.status !== 'active' ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} startTime={snapshot?.startTime ?? null} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(); setScanning(true); }} /> : (
+        <section className="space-y-4 rounded-xl border border-border bg-card p-5">
+          <h2 className="text-xl">Night patrol</h2>
+          <p className="text-sm">{formatDateTime(shift.scheduled_start)} – {formatDateTime(shift.scheduled_end)} · Muscat time</p>
+          <div className="rounded-lg bg-secondary-light p-4"><p className="text-2xl font-semibold text-primary">{complete}<span className="text-base font-normal"> / {checkpoints.length} locations</span></p><p className="mt-1 text-sm text-primary">{complete === checkpoints.length && checkpoints.length > 0 ? 'All locations verified for this shift' : 'Scan each location once to complete your round'}</p></div>
+          <p className="text-sm">On duty: {shift.on_duty_name ?? fullName}</p>
+          {!scanning ? <Button className="min-h-14 w-full text-base" icon={ScanLine} loading={busy} disabled={syncing || !inWindow || checkpoints.length === 0} onClick={() => { setActionError(null); setNotice(null); setScanning(true); }}>Scan location</Button> : null}
+          {!inWindow ? <p className="text-sm">This shift has ended. Refresh to choose your next shift hours.</p> : null}
+        </section>
+      )}
+          {scanning && shift?.status === 'active' ? <PatrolScanner onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
           <section>
             <h2 className="mb-3 text-lg">Your locations</h2>
             {!checkpoints.length ? <p>Your manager needs to add the patrol locations.</p> : null}
             <ul className="divide-y divide-border">
               {checkpoints.map((checkpoint) => {
-                const waiting = pending.some((receipt) => receipt.shiftId === shift.id && receipt.checkpointId === checkpoint.checkpoint_id);
+                const waiting = pending.some((receipt) => receipt.shiftId === shift?.id && receipt.checkpointId === checkpoint.checkpoint_id);
                 const label = checkpoint.completed ? `Verified · ${formatTime(checkpoint.scanned_at ?? '')}` : waiting ? 'Pending upload'
-                  : checkpoint.validation === 'flagged' ? 'Awaiting supervisor review' : checkpoint.validation === 'rejected' ? 'Rejected — scan again at the location' : 'Not yet visited';
+                  : checkpoint.validation === 'flagged' ? 'Awaiting supervisor review' : checkpoint.validation === 'rejected' ? 'Rejected — scan again at the location' : shift?.status === 'active' ? 'Not yet visited' : 'Ready to scan when you start';
                 return <li key={checkpoint.checkpoint_id} className="flex items-center gap-3 py-4">
                   {checkpoint.completed ? <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" /> : <MapPin className="size-5 shrink-0 text-primary" aria-hidden="true" />}
                   <div className="min-w-0 flex-1"><p className="font-medium">{checkpoint.sequence}. {checkpoint.checkpoint_name}</p><p className="text-sm text-muted-foreground">{label}</p></div>
@@ -128,8 +101,6 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
               })}
             </ul>
           </section>
-        </>
-      )}
       {receipts.length ? <details className="border-t border-border pt-4"><summary className="cursor-pointer font-semibold">Recent scans on this phone</summary><ul className="mt-3 divide-y divide-border">{receipts.slice(0, 20).map((receipt) => <li key={receipt.id} className="space-y-1 py-3 text-sm"><p className="font-medium">{receipt.checkpointName}</p><p>{formatDateTime(receipt.deviceTime)} · {receipt.state === 'pending' ? 'Pending upload' : receipt.validation === 'valid' ? 'Verified' : receipt.validation === 'flagged' ? 'Awaiting review' : 'Rejected'}</p>{receipt.error ? <p>{receipt.error}</p> : null}{receipt.flags?.length ? <p>Checks: {receipt.flags.map((flag) => flag.replaceAll('_', ' ')).join(', ')}</p> : null}</li>)}</ul></details> : null}
     </div>
   );
