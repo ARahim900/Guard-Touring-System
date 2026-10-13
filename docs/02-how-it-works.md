@@ -115,7 +115,7 @@ Muscat Bay security uses **one shared login**, with one guard patrolling once a 
   - **iOS** shows the blue location indicator.
 - Points are recorded about once a minute, or every 25 m moved. They go to the outbox first, then upload in batches.
 - If the phone restarts during a shift, tracking resumes the next time the app opens.
-- Google Play requires an in-app explanation **before** the background permission prompt. The app shows it when the guard taps Start patrol.
+- Android policy expects an in-app explanation **before** the background permission prompt. The app shows it when the guard taps Start patrol.
 
 ## 2.7 Statistics (identical everywhere)
 `patrol_stats()` is one server function, used by the guard's Statistic tab, the portal and the monthly PDF, so the numbers always agree.

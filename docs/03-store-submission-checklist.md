@@ -1,4 +1,4 @@
-# 3. App Store and Google Play submission checklist
+# 3. iPhone (TestFlight) and Android (direct APK) release checklist
 
 Tick every line before submitting. Items already handled in the code are marked ✅. Items you must do are marked ☐.
 
@@ -17,8 +17,9 @@ Tick every line before submitting. Items already handled in the code are marked 
 - ✅ Crash reporting (Sentry) with no personal data.
 
 ## 3.2 Apple App Store
-- ☐ Check how the Apple Developer account is enrolled. **Organisation** (needs Muscat Bay's D-U-N-S number) shows *Muscat Bay* as the seller. **Individual** shows the account holder's personal name on the App Store page; it cannot be changed later without transferring the app.
-- ☐ Pilot through **TestFlight** first (no App Review for internal testers; each build lasts 90 days), then request **Unlisted** distribution. Apple often rejects login-only internal tools from the public listing.
+- ✅ Account: **Individual** Apple Developer account. The App Store and TestFlight show the account holder's name as the developer, not Muscat Bay. If Muscat Bay later enrols as an Organisation, move the app with Apple's **App Transfer**; the bundle ID `com.muscatbay.patrol` stays the same.
+- ☐ Distribute through **TestFlight**. Build with `npm run build:ios`, then upload with `npm run submit:ios`. Invite the security phones as **external testers** (email or public link). The first build of each version goes through a short Beta App Review. Each build expires after **90 days**, so publish a new build before then.
+- ☐ Only if a permanent install is needed: request **Unlisted** distribution. Apple often rejects login-only internal tools from the public listing.
 - ✅ Permission texts (Info.plist) explain each use:
   - location when in use
   - location always
@@ -42,24 +43,20 @@ Tick every line before submitting. Items already handled in the code are marked 
 - ☐ Consider **Unlisted** distribution (only people with the link can find it) or **Apple Business Manager** custom-app distribution. This suits an internal tool.
 - ☐ Screenshots for 6.9" and 6.5" iPhones: Work, Scan, Report, Histories, Statistic.
 
-## 3.3 Google Play
-- ✅ Permissions declared:
-  - `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`
-  - `FOREGROUND_SERVICE_LOCATION`
-  - `CAMERA`, `RECORD_AUDIO`, `NFC`
-- ✅ Unused storage and media-playback service permissions are blocked.
-- ✅ **Prominent disclosure** is shown before the background-location prompt (Work tab → Start patrol).
-- ✅ Foreground-service notification while tracking.
-- ☐ Play Console → **App content**:
-  - **Privacy policy**: the public URL.
-  - **Data safety**: Location (precise), Personal info (name, email, phone), Photos, Audio, App activity, Crash logs. All for *App functionality*; none shared or sold. Data is encrypted in transit. Users can request deletion via the privacy contact.
-  - **Location permissions declaration** (background): describe the feature ("live patrol tracking during an active security shift") and upload a **short video**. It must show the disclosure dialog, the permission prompt and the tracking notification.
-  - **Foreground service declaration**: type *location*, same justification and video.
-  - **Target audience**: 18+. Not designed for children.
-  - **Ads**: none.
-- ☐ Consider a **private app** through Managed Google Play, if the contractor phones are company-managed.
-- ☐ Use the internal testing track first (`eas.json` submits there), then closed testing, then production.
-- ☐ Screenshots (phone): same set as iOS. Feature graphic 1024×500.
+## 3.3 Android: direct APK installation (no Google Play)
+Decision: the guard phones install the app directly from an APK file. Google Play's listing, Data safety form and background-location video are therefore not required.
+- ✅ Permissions declared: `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE_LOCATION`, `CAMERA`, `RECORD_AUDIO`, `NFC`. Unused storage and media-playback permissions are blocked.
+- ✅ **Prominent disclosure** is shown before the background-location prompt (Work tab → Start patrol), and a notification is shown while tracking.
+- ☐ Build: in `apps/guard`, run `npm run build:apk`. When the build finishes, Expo shows a download link and QR code.
+- ☐ Install on each phone:
+  1. Open the link on the phone and download the APK.
+  2. When Android asks, allow **Install unknown apps** for the browser.
+  3. If Play Protect warns about an unknown developer, choose **Install anyway**.
+  4. Settings → Apps → MB Patrol → Battery → **Unrestricted**. Otherwise some phones stop background tracking.
+- ☐ Updates: build a new APK and install it **over** the old one. Saved scans and the login are kept because Expo signs every build with the same key.
+  - **Never uninstall** the app while Histories shows uploads pending. Uninstalling deletes scans that are saved offline.
+  - Download a backup of the signing key once (`npx eas-cli credentials` → Android → Download keystore) and store it with Muscat Bay's IT records. Without it, an update cannot be installed over the existing app.
+- ☐ Google has announced that, from 2026 onwards and country by country, certified Android phones will only install apps from **verified developers**, including apps installed directly. Check the status for Oman before 2027. If it applies, register in the Android Developer Console; the APK route itself stays the same.
 
 ## 3.4 After release
 - ☐ Watch Sentry for the first week; fix any crash-free-session rate below 99.5%.

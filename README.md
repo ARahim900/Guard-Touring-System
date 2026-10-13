@@ -12,7 +12,7 @@ A security patrol system for Muscat Bay, built in one release. It has three part
 
 1. **[Installation, step by step](docs/01-installation.md)**: from a clean computer to a working system.
 2. **[How it works](docs/02-how-it-works.md)**: the design explained from first principles (security, offline sync, scan validation).
-3. **[App Store and Google Play checklist](docs/03-store-submission-checklist.md)**.
+3. **[iPhone and Android release checklist](docs/03-store-submission-checklist.md)**.
 4. **[Privacy policy](docs/privacy-policy.md)**: complete the items in [square brackets] before release.
 
 ## Folder structure

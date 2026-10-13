@@ -157,7 +157,7 @@ NFC, background location and Sentry use native code that the general-purpose **E
 ### 4.2 Accounts you need
 - **Expo** account (free): https://expo.dev/signup
 - **Apple Developer Program** (USD 99/year), for iPhone builds and the App Store.
-- **Google Play Console** (USD 25 once), for the Play Store.
+- No Google Play account: Android phones install the app directly from an APK file (see 4.6).
 
 ### 4.3 Install and link
 ```bash
@@ -191,12 +191,13 @@ eas build --profile development --platform ios       # needs Apple Developer; re
 npx expo start --dev-client                          # then open the installed app; it connects to your computer
 ```
 
-### 4.6 Production builds and store submission
+### 4.6 Production builds
 ```bash
-eas build --profile production --platform all
-eas submit --platform android --latest     # goes to the Play "internal testing" track first
-eas submit --platform ios --latest         # goes to TestFlight
+eas build --profile production-apk --platform android   # Android: an APK to install directly on each guard phone
+eas build --profile production --platform ios            # iPhone: the first run asks for your Apple ID and creates the certificates
+eas submit --platform ios --latest                       # uploads to TestFlight
 ```
+No Mac is needed; both builds run in Expo's cloud. Installing the APK and inviting TestFlight testers are described in the checklist.
 Before submitting, work through [the store checklist](03-store-submission-checklist.md).
 
 ---

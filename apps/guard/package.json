@@ -12,6 +12,8 @@
     "build:dev:android": "eas build --profile development --platform android",
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:prod": "eas build --profile production --platform all",
+    "build:ios": "eas build --profile production --platform ios",
+    "build:apk": "eas build --profile production-apk --platform android",
     "submit:android": "eas submit --platform android --latest",
     "submit:ios": "eas submit --platform ios --latest"
   },

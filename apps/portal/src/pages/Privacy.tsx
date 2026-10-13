@@ -22,7 +22,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Who can see it',
     body: [
-      'Muscat Bay supervisors and administrators, and supervisors of your own security contractor. Monthly performance reports are shared with your contractor. We do not sell your data or use it for advertising.',
+      'Authorised Muscat Bay supervisors and administrators only. The security team’s login shows only the security team’s own patrol records. Security contractor management has no access to the system. We do not sell your data or use it for advertising.',
       'Data is stored with our hosting provider, Supabase, and crash reports with Sentry, under contracts that protect it.',
     ],
   },

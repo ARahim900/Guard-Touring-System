@@ -14,8 +14,9 @@ MB Patrol is an internal tool operated by Saraya Bandar Jissah SAOC ("Muscat Bay
 - **Crash reports** (device model, operating system, app version, error details), sent to our crash-reporting provider, Sentry. These do not include your name, email or location.
 
 ## Who can see it
-- Muscat Bay supervisors and administrators, and supervisors of your own security contractor.
-- Monthly performance reports are shared with your contractor.
+- Authorised Muscat Bay supervisors and administrators only.
+- The security team's login shows only the security team's own patrol records.
+- Security contractor management has no access to the system.
 - We do not sell your data or use it for advertising.
 - Data is stored with our hosting provider, Supabase, and crash reports with Sentry, under contracts that protect it.
 
