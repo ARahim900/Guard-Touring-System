@@ -5,12 +5,12 @@
 // away are rejected. Best practice: stand at the checkpoint with a tablet or
 // phone, open this page, and press "Use my location"; or click the map.
 // =============================================================================
-import { Crosshair, MapPin, Pencil, Plus, Printer } from 'lucide-react';
-import QRCode from 'qrcode';
+import { Crosshair, MapPin, Pencil, Plus, QrCode } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Circle, Marker } from 'react-leaflet';
 import { toast } from 'sonner';
 
+import { CheckpointQrPreview } from '@/components/CheckpointQrPreview';
 import { BaseMap, CheckpointLayer, ClickToPick, FitBounds, icons } from '@/components/PatrolMap';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Spinner, Table, Td, Textarea } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
@@ -28,10 +28,13 @@ function nextCode(list: Checkpoint[]): string {
 }
 
 export default function CheckpointsPage() {
-  const { data, loading, error, reload } = useAsync(async () => unwrap(await supabase.from('checkpoints').select('*').order('name')) as Checkpoint[], []);
+  const { data, loading, error, reload } = useAsync(async () => unwrap(await supabase.from('checkpoints').select('id, name, code, nfc_uid, description, latitude, longitude, radius_m, active').order('name')) as Checkpoint[], []);
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [qrPreview, setQrPreview] = useState<{ id?: string } | null>(null);
+  const activeCheckpoints = useMemo(() => (data ?? []).filter((checkpoint) => checkpoint.active), [data]);
+  const previewCheckpoints = useMemo(() => qrPreview?.id ? (data ?? []).filter((checkpoint) => checkpoint.id === qrPreview.id) : activeCheckpoints, [data, qrPreview, activeCheckpoints]);
 
   const points = useMemo(() => (data ?? []).map((c) => [c.latitude, c.longitude] as [number, number]), [data]);
 
@@ -85,28 +88,6 @@ export default function CheckpointsPage() {
     void reload({ silent: true });
   }
 
-  /** Opens a printable sheet of QR labels (print on sticker paper, laminate outdoors). */
-  async function printLabels() {
-    const list = (data ?? []).filter((c) => c.active);
-    if (!list.length) return toast.info('No active checkpoints to print.');
-    const imgs = await Promise.all(list.map((c) => QRCode.toDataURL(c.code, { width: 360, margin: 1, errorCorrectionLevel: 'M' })));
-    const w = window.open('', '_blank');
-    if (!w) return toast.error('Allow pop-ups to print labels.');
-    const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => `&#${ch.charCodeAt(0)};`);
-    w.document.write(`<!doctype html><title>Checkpoint labels</title>
-      <style>body{font-family:'DM Sans',Arial,sans-serif;margin:12mm}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm}
-      .l{border:1.5px solid #4E4456;border-radius:6px;padding:4mm;text-align:center;break-inside:avoid}
-      .l img{width:48mm;height:48mm}.n{font-weight:700;color:#4E4456;font-size:12pt}.c{font-family:monospace;font-size:10pt}
-      .b{font-size:8pt;color:#6B7280}</style>
-      <div class="grid">${list.map((c, i) => `<div class="l"><img src="${imgs[i]}"><div class="n">${esc(c.name)}</div><div class="c">${esc(c.code)}</div><div class="b">Muscat Bay · Security checkpoint</div></div>`).join('')}</div>`);
-    w.document.close();
-    // Print from here (an inline <script> would be blocked by our security policy).
-    setTimeout(() => {
-      w.focus();
-      w.print();
-    }, 500);
-  }
-
   const lat = Number(form?.latitude);
   const lng = Number(form?.longitude);
   const hasPos = form && form.latitude !== '' && form.longitude !== '' && Number.isFinite(lat) && Number.isFinite(lng);
@@ -118,36 +99,36 @@ export default function CheckpointsPage() {
         subtitle="Each checkpoint has a printed QR/barcode label and, optionally, an NFC tag."
         actions={
           <>
-            <Button variant="outline" icon={Printer} onClick={() => void printLabels()}>Print QR labels</Button>
+            <Button variant="outline" icon={QrCode} disabled={!activeCheckpoints.length} onClick={() => setQrPreview({})}>QR codes / print</Button>
             <Button icon={Plus} onClick={() => setForm(blank(nextCode(data ?? [])))}>New checkpoint</Button>
           </>
         }
       />
       <div className="grid gap-[14px] xl:grid-cols-[1fr_1fr]">
-        <Card>
+        <Card className="min-w-0">
           <ErrorNote message={error} />
           {loading ? (
             <Spinner />
           ) : !data?.length ? (
             <EmptyState icon={MapPin} title="No checkpoints yet" message="Create your first checkpoint, then print its QR label." />
           ) : (
-            <Table head={['Name', 'Code', 'NFC', 'Radius', 'Status', '']}>
+            <Table head={['Name', 'Code', 'Radius', 'Status', 'QR code', '']}>
               {data.map((c) => (
                 <tr key={c.id}>
                   <Td className="font-medium">{c.name}</Td>
                   <Td className="font-mono text-xs">{c.code}</Td>
-                  <Td>{c.nfc_uid ? <Badge label="Tag set" tone="brand" /> : '–'}</Td>
                   <Td>{c.radius_m} m</Td>
                   <Td>{c.active ? <Badge label="Active" tone="success" /> : <Badge label="Retired" />}</Td>
+                  <Td><Button size="sm" variant="outline" icon={QrCode} aria-label={`View QR for ${c.name}`} onClick={() => setQrPreview({ id: c.id })}>View QR</Button></Td>
                   <Td className="text-right"><Button size="sm" variant="outline" icon={Pencil} onClick={() => edit(c)}>Edit</Button></Td>
                 </tr>
               ))}
             </Table>
           )}
         </Card>
-        <Card>
+        <Card className="min-w-0">
           <div className="-m-5">
-            <BaseMap className="h-[520px] w-full rounded-lg">
+            <BaseMap satellite className="h-[520px] w-full rounded-lg">
               <FitBounds points={points} />
               <CheckpointLayer checkpoints={(data ?? []).filter((c) => c.active)} />
             </BaseMap>
@@ -155,6 +136,7 @@ export default function CheckpointsPage() {
         </Card>
       </div>
 
+      {qrPreview ? <CheckpointQrPreview checkpoints={previewCheckpoints} initialId={qrPreview.id} onClose={() => setQrPreview(null)} /> : null}
       <Modal
         open={Boolean(form)}
         wide
@@ -193,11 +175,11 @@ export default function CheckpointsPage() {
             </div>
             <div>
               <p className="mb-1 text-sm font-medium">Click the map to set the position</p>
-              <BaseMap className="h-[420px] w-full rounded-md" center={hasPos ? [lat, lng] : undefined} zoom={hasPos ? 18 : undefined}>
+              <BaseMap satellite className="h-[420px] w-full rounded-md" center={hasPos ? [lat, lng] : undefined} zoom={hasPos ? 18 : undefined}>
                 <ClickToPick onPick={(la, ln) => setForm((f) => f && { ...f, latitude: la.toFixed(7), longitude: ln.toFixed(7) })} />
                 {hasPos ? (
                   <>
-                    <Circle center={[lat, lng]} radius={Number(form.radius_m) || 30} pathOptions={{ color: '#4E4456', fillColor: '#A1D1D5', fillOpacity: 0.3 }} />
+                    <Circle center={[lat, lng]} radius={Number(form.radius_m) || 30} pathOptions={{ color: '#4E4456', fillColor: '#A4C5BB', fillOpacity: 0.3 }} />
                     <Marker position={[lat, lng]} icon={icons.checkpoint(form.name || 'New')} />
                   </>
                 ) : null}

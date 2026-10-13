@@ -1,5 +1,5 @@
 // =============================================================================
-// Map building blocks (Leaflet + OpenStreetMap tiles, no API key needed).
+// Map building blocks (Leaflet with street and satellite basemaps).
 // =============================================================================
 // Markers are drawn as small HTML badges ("divIcon") rather than image pins.
 // That avoids Leaflet's well-known broken-image problem with bundlers and lets
@@ -7,7 +7,7 @@
 // =============================================================================
 import L from 'leaflet';
 import { useEffect, type ReactNode } from 'react';
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, LayersControl, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 
 import { guardName } from '@/lib/labels';
 import type { Alarm, Checkpoint, LivePosition } from '@/lib/types';
@@ -47,14 +47,26 @@ export const icons = {
     }),
 };
 
-export function BaseMap({ children, className, center, zoom }: { children?: ReactNode; className?: string; center?: [number, number]; zoom?: number }) {
+export function BaseMap({ children, className, center, zoom, satellite = false }: { satellite?: boolean; children?: ReactNode; className?: string; center?: [number, number]; zoom?: number }) {
   return (
     <MapContainer center={center ?? DEFAULT_CENTER} zoom={zoom ?? DEFAULT_ZOOM} className={className ?? 'h-[480px] w-full rounded-lg'} scrollWheelZoom>
+      <LayersControl position="topright" collapsed={false}>
+      <LayersControl.BaseLayer checked={satellite} name="Satellite">
+        <TileLayer
+          attribution='Tiles &copy; <a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9">Esri</a> — Esri, Vantor, Earthstar Geographics, and the GIS User Community'
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          maxNativeZoom={19}
+          maxZoom={19}
+        />
+      </LayersControl.BaseLayer>
+      <LayersControl.BaseLayer checked={!satellite} name="Street">
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
       />
+      </LayersControl.BaseLayer>
+      </LayersControl>
       {children}
     </MapContainer>
   );
