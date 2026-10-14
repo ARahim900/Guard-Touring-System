@@ -5,7 +5,7 @@
 // away are rejected. Best practice: stand at the checkpoint with a tablet or
 // phone, open this page, and press "Use my location"; or click the map.
 // =============================================================================
-import { Crosshair, MapPin, Pencil, Plus, QrCode, ScanLine } from 'lucide-react';
+import { Crosshair, MapPin, Pencil, Plus, QrCode, ScanLine, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Circle, Marker } from 'react-leaflet';
 import { Link } from 'react-router';
@@ -32,6 +32,7 @@ export default function CheckpointsPage() {
   const { data, loading, error, reload } = useAsync(async () => unwrap(await supabase.from('checkpoints').select('id, name, code, nfc_uid, description, latitude, longitude, radius_m, active, placed_at').order('name')) as Checkpoint[], []);
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [locating, setLocating] = useState(false);
   const [qrPreview, setQrPreview] = useState<{ id?: string } | null>(null);
   // Labels are printed for locations in use AND for those not yet placed, so they can be fixed on site.
@@ -60,6 +61,22 @@ export default function CheckpointsPage() {
       },
       { enableHighAccuracy: true, timeout: 15000 },
     );
+  }
+
+  /**
+   * Deletes a location with no patrol history. One with history is retired
+   * instead (hidden from guards), so past reports stay complete.
+   */
+  async function remove() {
+    if (!form?.id) return;
+    if (!window.confirm(`Delete "${form.name}"? Guards will no longer see it. If it has patrol history it is retired instead, so past reports stay complete.`)) return;
+    setDeleting(true);
+    const { data: outcome, error: deleteError } = await supabase.rpc('delete_checkpoint', { p_id: form.id });
+    setDeleting(false);
+    if (deleteError) return toast.error(friendlyError(deleteError));
+    toast.success(outcome === 'deleted' ? `${form.name} deleted.` : `${form.name} has patrol history, so it was retired (hidden from guards) instead. Past reports keep it.`);
+    setForm(null);
+    void reload({ silent: true });
   }
 
   async function save() {
@@ -150,6 +167,7 @@ export default function CheckpointsPage() {
         onClose={() => setForm(null)}
         footer={
           <>
+            {form?.id ? <Button variant="danger" icon={Trash2} loading={deleting} className="mr-auto" onClick={() => void remove()}>Delete location</Button> : null}
             <Button variant="outline" onClick={() => setForm(null)}>Cancel</Button>
             <Button loading={saving} onClick={() => void save()}>Save</Button>
           </>

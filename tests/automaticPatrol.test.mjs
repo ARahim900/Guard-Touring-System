@@ -100,7 +100,7 @@ test('scheduler records an unstarted night as missed and preserves its required 
   assert.equal(report.shifts[0].actual_start,null);
 });
 
-test('new locations and changed hours affect upcoming patrols while an active patrol stays intact',async()=>{
+test('a new location joins the running patrol; changed hours affect only upcoming patrols',async()=>{
   await setup();
   const first=(await nights())[0];
   await asUser(guard);
@@ -112,7 +112,7 @@ test('new locations and changed hours affect upcoming patrols while an active pa
   assert.equal(new Date(rows[0].scheduled_start).toISOString(),'2026-12-31T16:00:00.000Z');
   assert.equal(new Date(rows[1].scheduled_start).toISOString(),'2027-01-01T17:00:00.000Z');
   const counts=(await db.query('select shift_id,count(*)::int as n from public.shift_checkpoints group by shift_id')).rows;
-  assert.equal(counts.find(r=>r.shift_id===rows[0].id).n,1);
+  assert.equal(counts.find(r=>r.shift_id===rows[0].id).n,2,'the running patrol gains the new location');
   assert.equal(counts.find(r=>r.shift_id===rows[1].id).n,2);
 });
 
