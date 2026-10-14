@@ -105,7 +105,7 @@ export default function CheckpointsPage() {
         actions={
           <>
             <Button variant="outline" icon={QrCode} disabled={!printable.length} onClick={() => setQrPreview({})}>QR codes / print</Button>
-            <Link to="/checkpoints/place" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-primary px-4 text-sm font-semibold text-primary hover:bg-muted"><ScanLine className="size-4" aria-hidden="true" />Place labels on site{unplaced ? ` (${unplaced} to do)` : ''}</Link>
+            <Link to="/checkpoints/place" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-primary px-4 text-sm font-semibold text-primary hover:bg-muted"><ScanLine className="size-4" aria-hidden="true" />Place locations{unplaced ? ` (${unplaced} to do)` : ''}</Link>
             <Button icon={Plus} onClick={() => setForm(blank(nextCode(data ?? [])))}>New checkpoint</Button>
           </>
         }

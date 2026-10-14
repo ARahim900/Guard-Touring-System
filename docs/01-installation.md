@@ -216,7 +216,10 @@ A change to native code (a new native library or permission, an Expo SDK upgrade
 
 ### 5.1 Place each checkpoint accurately
 Scans more than the checkpoint radius (default **30 m**) away are **rejected**. So GPS placement matters.
-- Quickest for many locations: add them by name (they show **Not placed** and stay inactive), print all labels (**QR codes / print**), then walk the site with your phone. At each location fix the label, stand right next to it in the open, open **Locations → Place labels on site** and scan it. The position is saved and the location goes live. A label that is already placed is only moved after you confirm.
+- Quickest for many locations: add them by name (they show **Not placed** and stay inactive), then open **Locations → Place locations**:
+  - **On the map** (no site visit): choose a location, zoom right in on the satellite view and tap the exact spot where its label is (drag the pin to adjust), or paste coordinates from Google Maps (press and hold the spot, copy the numbers). Save: the location goes live and the next one is selected.
+  - **Scan on site**: fix the label, stand next to it in the open and scan it; the phone's GPS position is saved. A label that is already placed is only moved after you confirm.
+  - Print the labels with **QR codes / print** and fix each one at the exact spot you pinned: guards must be within the radius (30 m) when they scan.
 - One at a time: stand at the checkpoint with a phone or tablet, open the portal's **Checkpoints** page, choose **New checkpoint** → **Use my location**.
 - Indoors (pump rooms, plant rooms, basements) GPS is often 20–60 m out. Choose one:
   - set the checkpoint position at the room entrance, or
