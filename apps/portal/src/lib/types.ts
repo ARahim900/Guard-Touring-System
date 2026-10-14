@@ -27,6 +27,8 @@ export interface Checkpoint {
   longitude: number;
   radius_m: number;
   active: boolean;
+  /** When the position was confirmed on site; null = label not yet placed. */
+  placed_at: string | null;
 }
 
 export interface Route {

@@ -5,9 +5,10 @@
 // away are rejected. Best practice: stand at the checkpoint with a tablet or
 // phone, open this page, and press "Use my location"; or click the map.
 // =============================================================================
-import { Crosshair, MapPin, Pencil, Plus, QrCode } from 'lucide-react';
+import { Crosshair, MapPin, Pencil, Plus, QrCode, ScanLine } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Circle, Marker } from 'react-leaflet';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 
 import { CheckpointQrPreview } from '@/components/CheckpointQrPreview';
@@ -20,7 +21,7 @@ import { unwrap, useAsync } from '@/lib/useAsync';
 
 type Form = Omit<Checkpoint, 'id' | 'latitude' | 'longitude' | 'radius_m'> & { id?: string; latitude: string; longitude: string; radius_m: string };
 
-const blank = (code: string): Form => ({ name: '', code, nfc_uid: null, description: null, latitude: '', longitude: '', radius_m: '30', active: true });
+const blank = (code: string): Form => ({ name: '', code, nfc_uid: null, description: null, latitude: '', longitude: '', radius_m: '30', active: true, placed_at: null });
 
 function nextCode(list: Checkpoint[]): string {
   const nums = list.map((c) => Number(c.code.match(/(\d+)$/)?.[1] ?? 0));
@@ -28,15 +29,17 @@ function nextCode(list: Checkpoint[]): string {
 }
 
 export default function CheckpointsPage() {
-  const { data, loading, error, reload } = useAsync(async () => unwrap(await supabase.from('checkpoints').select('id, name, code, nfc_uid, description, latitude, longitude, radius_m, active').order('name')) as Checkpoint[], []);
+  const { data, loading, error, reload } = useAsync(async () => unwrap(await supabase.from('checkpoints').select('id, name, code, nfc_uid, description, latitude, longitude, radius_m, active, placed_at').order('name')) as Checkpoint[], []);
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [qrPreview, setQrPreview] = useState<{ id?: string } | null>(null);
-  const activeCheckpoints = useMemo(() => (data ?? []).filter((checkpoint) => checkpoint.active), [data]);
-  const previewCheckpoints = useMemo(() => qrPreview?.id ? (data ?? []).filter((checkpoint) => checkpoint.id === qrPreview.id) : activeCheckpoints, [data, qrPreview, activeCheckpoints]);
+  // Labels are printed for locations in use AND for those not yet placed, so they can be fixed on site.
+  const printable = useMemo(() => (data ?? []).filter((checkpoint) => checkpoint.active || !checkpoint.placed_at), [data]);
+  const previewCheckpoints = useMemo(() => qrPreview?.id ? (data ?? []).filter((checkpoint) => checkpoint.id === qrPreview.id) : printable, [data, qrPreview, printable]);
+  const unplaced = (data ?? []).filter((checkpoint) => !checkpoint.placed_at).length;
 
-  const points = useMemo(() => (data ?? []).map((c) => [c.latitude, c.longitude] as [number, number]), [data]);
+  const points = useMemo(() => (data ?? []).filter((c) => c.placed_at).map((c) => [c.latitude, c.longitude] as [number, number]), [data]);
 
   function edit(c: Checkpoint) {
     setForm({ ...c, latitude: String(c.latitude), longitude: String(c.longitude), radius_m: String(c.radius_m) });
@@ -79,6 +82,8 @@ export default function CheckpointsPage() {
       longitude: lng,
       radius_m: radius,
       active: form.active,
+      // Saving an active location here confirms its position.
+      placed_at: form.active ? form.placed_at ?? new Date().toISOString() : form.placed_at,
     };
     const res = form.id ? await supabase.from('checkpoints').update(row).eq('id', form.id) : await supabase.from('checkpoints').insert(row);
     setSaving(false);
@@ -99,7 +104,8 @@ export default function CheckpointsPage() {
         subtitle="Each checkpoint has a printed QR/barcode label and, optionally, an NFC tag."
         actions={
           <>
-            <Button variant="outline" icon={QrCode} disabled={!activeCheckpoints.length} onClick={() => setQrPreview({})}>QR codes / print</Button>
+            <Button variant="outline" icon={QrCode} disabled={!printable.length} onClick={() => setQrPreview({})}>QR codes / print</Button>
+            <Link to="/checkpoints/place" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-primary px-4 text-sm font-semibold text-primary hover:bg-muted"><ScanLine className="size-4" aria-hidden="true" />Place labels on site{unplaced ? ` (${unplaced} to do)` : ''}</Link>
             <Button icon={Plus} onClick={() => setForm(blank(nextCode(data ?? [])))}>New checkpoint</Button>
           </>
         }
@@ -118,7 +124,7 @@ export default function CheckpointsPage() {
                   <Td className="font-medium">{c.name}</Td>
                   <Td className="font-mono text-xs">{c.code}</Td>
                   <Td>{c.radius_m} m</Td>
-                  <Td>{c.active ? <Badge label="Active" tone="success" /> : <Badge label="Retired" />}</Td>
+                  <Td>{!c.placed_at ? <Badge label="Not placed" tone="warning" /> : c.active ? <Badge label="Active" tone="success" /> : <Badge label="Retired" />}</Td>
                   <Td><Button size="sm" variant="outline" icon={QrCode} aria-label={`View QR for ${c.name}`} onClick={() => setQrPreview({ id: c.id })}>View QR</Button></Td>
                   <Td className="text-right"><Button size="sm" variant="outline" icon={Pencil} onClick={() => edit(c)}>Edit</Button></Td>
                 </tr>

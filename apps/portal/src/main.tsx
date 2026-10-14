@@ -74,6 +74,7 @@ const router = createBrowserRouter([
           { path: 'shifts', lazy: page(() => import('@/pages/Shifts')) },
           { path: 'routes', lazy: page(() => import('@/pages/Routes')) },
           { path: 'checkpoints', lazy: page(() => import('@/pages/Checkpoints')) },
+          { path: 'checkpoints/place', lazy: page(() => import('@/pages/PlaceLabels')) },
           { path: 'guards', lazy: page(() => import('@/pages/Guards')) },
           { path: 'reports', lazy: page(() => import('@/pages/Reports')) },
           { path: '*', element: <Navigate to="/" replace /> },
