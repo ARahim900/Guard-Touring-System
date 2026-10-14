@@ -240,7 +240,7 @@ Scans more than the checkpoint radius (default **30 m**) away are **rejected**. 
 | 8 | Hold SOS for 2 s | Portal sounds an alarm, shows a pop-up, and a red marker at the guard's position |
 | 9 | Skip a checkpoint past its due time + 15 min | "Missed checkpoint" alarm within 5 min |
 | 10 | Android: enable a fake-GPS app, then scan | **Rejected – fake GPS** |
-| 11 | End shift | Tracking notification disappears; live map drops the guard |
+| 11 | Wait for the shift end time (or test with a short shift) | The patrol closes by itself; tracking notification disappears; live map drops the guard |
 | 12 | Reports → choose the dates → Generate report → PDF | PDF with completion, punctuality and the daily patrol log naming the guard on duty each day |
 
 ## Everyday commands

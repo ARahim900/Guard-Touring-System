@@ -1,4 +1,4 @@
-import { CheckCircle2, PlayCircle, StopCircle } from 'lucide-react-native';
+import { CheckCircle2, Clock3, PlayCircle } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
@@ -7,18 +7,18 @@ import { useShift } from '@/context/ShiftProvider';
 import { useToast } from '@/context/ToastProvider';
 import { friendlyError } from '@/lib/errors';
 import { spacing } from '@/lib/theme';
+import { formatTime } from '@/lib/time';
 
 export function ShiftControls() {
-  const { shift, checkpoints, guardNames, fromCache, startShift, endShift } = useShift();
+  const { shift, guardNames, fromCache, startShift } = useShift();
   const toast = useToast();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  const remaining = checkpoints.filter((cp) => !cp.completed).length;
 
-  async function act(action: 'start' | 'end') {
+  async function act() {
     setBusy(true);
     try {
-      const result = action === 'start' ? await startShift(name) : await endShift();
+      const result = await startShift(name);
       if (result.ok) {
         toast.success(result.message);
         setName('');
@@ -33,18 +33,21 @@ export function ShiftControls() {
   function start() {
     if (!name) return toast.error('Choose your name to start.');
     Alert.alert('Location during your shift', 'MB Patrol collects your location during your shift, including in the background, for patrol monitoring and emergency assistance. Location permissions are requested next.', [
-      { text: 'Cancel', style: 'cancel' }, { text: 'Start patrol', onPress: () => void act('start') },
+      { text: 'Cancel', style: 'cancel' }, { text: 'Start patrol', onPress: () => void act() },
     ]);
   }
 
-  function finish() {
-    Alert.alert('Finish patrol?', `${remaining} location(s) are not yet verified. Saved records will upload before the shift finishes. You cannot restart this shift.`, [
-      { text: 'Keep patrolling', style: 'cancel' }, { text: 'Finish patrol', onPress: () => void act('end') },
-    ]);
-  }
 
   if (shift?.status === 'active') {
-    return <Card><Button title="Finish patrol" icon={StopCircle} loading={busy} onPress={finish} /></Card>;
+    // No finish button: the patrol closes by itself at its end time.
+    return (
+      <Card>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+          <Clock3 size={20} />
+          <AppText variant="body" style={{ flex: 1 }}>Patrol in progress. Scan each location. It ends automatically at {formatTime(shift.scheduled_end)}.</AppText>
+        </View>
+      </Card>
+    );
   }
   return (
     <Card>

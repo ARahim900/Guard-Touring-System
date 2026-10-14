@@ -16,7 +16,7 @@ import { reportError } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import type { Shift, ShiftCheckpoint } from '@/lib/types';
 import { readCache, writeCache } from '@/offline/cache';
-import { localScanCheckpoints, pendingCounts } from '@/offline/outbox';
+import { localScanCheckpoints } from '@/offline/outbox';
 import { subscribeSync, syncNow } from '@/offline/sync';
 import { isTracking, startTracking, stopTracking } from '@/services/location';
 import { useAuth } from './AuthProvider';
@@ -44,7 +44,6 @@ interface ShiftContextValue {
   reloadLocal: () => Promise<void>;
   /** Start a patrol now and record who is on duty (the login is shared). */
   startShift: (onDutyName: string) => Promise<{ ok: boolean; message: string }>;
-  endShift: () => Promise<{ ok: boolean; message: string }>;
 }
 
 const ShiftContext = createContext<ShiftContextValue | null>(null);
@@ -244,20 +243,6 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     return { ok: true, message: 'Shift started. Have a safe patrol.' };
   }, [load, guardId]);
 
-  const endShift = useCallback(async () => {
-    const shift = snapshot.shift;
-    if (!shift) return { ok: false, message: 'No active shift.' };
-    await syncNow().catch(() => undefined); // push the last GPS points first
-    const pending = guardId ? await pendingCounts(guardId) : null;
-    if (!pending || pending.scans > 0 || pending.attachments > 0 || pending.failed > 0) {
-      return { ok: false, message: 'Some records have not uploaded. Reconnect and check History before finishing.' };
-    }
-    const { error: rpcError } = await supabase.rpc('end_shift', { p_shift_id: shift.id });
-    if (rpcError) return { ok: false, message: friendlyError(rpcError) };
-    await stopTracking().catch((e) => reportError(e, { where: 'stopTracking' }));
-    await load();
-    return { ok: true, message: 'Shift ended. Thank you.' };
-  }, [snapshot.shift, load, guardId]);
 
   const reloadLocal = useCallback(() => refreshLocal(snapshot.shift?.id), [refreshLocal, snapshot.shift?.id]);
 
@@ -284,9 +269,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       refresh,
       reloadLocal,
       startShift,
-      endShift,
     }),
-    [snapshot.shift, snapshot.guardNames, snapshot.appRelease, checkpoints, loading, refreshing, error, fromCache, updatedAt, refresh, reloadLocal, startShift, endShift],
+    [snapshot.shift, snapshot.guardNames, snapshot.appRelease, checkpoints, loading, refreshing, error, fromCache, updatedAt, refresh, reloadLocal, startShift],
   );
 
   return <ShiftContext.Provider value={value}>{children}</ShiftContext.Provider>;

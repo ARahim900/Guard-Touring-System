@@ -113,7 +113,7 @@ Muscat Bay security uses **one shared login**, with one guard patrolling once a 
 - The portal receives new alarms through **Realtime**, a WebSocket the server pushes to. Supervisors get a pop-up and a sound within a second, on any page. SOS pop-ups stay on screen for a minute.
 
 ## 2.6 Background location
-- Tracking runs **only** between Start shift and End shift.
+- Tracking runs **only** while a patrol is active. Guards never finish a patrol by hand: it closes by itself at the end of the shift (night shift end time, or 12 hours after the start if no hours are saved), and tracking stops then.
   - **Android** shows a permanent "Patrol shift in progress" notification (a foreground service). Android requires it, and it is honest to the guard.
   - **iOS** shows the blue location indicator.
 - Points are recorded about once a minute, or every 25 m moved. They go to the outbox first, then upload in batches.

@@ -21,7 +21,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     body: [
       'Account details: name, work email, employee number and phone number. Used to sign you in and to identify your patrol records. Where a login is shared, the guard name chosen at the start of a patrol is recorded with that shift for the same purpose.',
       'Checkpoint scans: the checkpoint, the time on your phone and on our server, your GPS position and its accuracy, and whether the phone reported a simulated ("mock") location. Used to confirm that each checkpoint was visited.',
-      'Location during shifts: while your shift is active, your position is recorded about once a minute, including when the app is closed or not in use, so supervisors can see patrol progress and respond to an SOS. Location is never collected outside an active shift. Tracking stops when you end your shift.',
+      'Location during shifts: while your shift is active, your position is recorded about once a minute, including when the app is closed or not in use, so supervisors can see patrol progress and respond to an SOS. Location is never collected outside an active shift. Tracking stops when the patrol ends, which happens automatically at the end of the shift.',
       'Photos, voice memos and notes that you choose to attach to a scan. Gallery photos are checked against the date they were taken, so photos taken before your shift can be reviewed.',
       'SOS alerts, including your position at the time.',
       'Crash reports (device model, operating system, app version, error details) sent to our crash-reporting provider, Sentry. These do not include your name, email or location.',

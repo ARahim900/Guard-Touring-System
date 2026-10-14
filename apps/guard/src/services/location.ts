@@ -92,7 +92,7 @@ export async function startTracking(shiftId: string, guardId: string): Promise<{
     showsBackgroundLocationIndicator: true,
     foregroundService: {
       notificationTitle: 'Patrol shift in progress',
-      notificationBody: 'MB Patrol is sharing your location with supervisors until you end your shift.',
+      notificationBody: 'MB Patrol is sharing your location with supervisors until your patrol ends.',
       notificationColor: colors.primary,
       killServiceOnDestroy: false,
     },
