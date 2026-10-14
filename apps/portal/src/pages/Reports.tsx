@@ -1,23 +1,33 @@
 import { CheckCircle2, ClipboardList, FileDown, Play, ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ScanDetail } from '@/components/ScanDetail';
-import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, StatCard, Table, Td } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, StatCard, Table, Td } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
-import { buildReportCsv, coordinates, evidenceTime, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
+import { NIGHTS_NEEDING_ATTENTION, buildReportCsv, coordinates, evidenceTime, nightRows, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
 import { buildReportPdf } from '@/lib/reportPdf';
 import { supabase } from '@/lib/supabase';
-import { dayKey } from '@/lib/time';
-import { unwrap, useAsync } from '@/lib/useAsync';
+import { addDays, dayKey } from '@/lib/time';
+import { unwrap } from '@/lib/useAsync';
 
 const PAGE_SIZE = 50;
 
+/** One-tap periods. A night belongs to the date its patrol started. */
+function quickRanges(today = dayKey()) {
+  const firstOfMonth = `${today.slice(0, 8)}01`;
+  const endOfLastMonth = addDays(firstOfMonth, -1);
+  return [
+    { label: 'Last night', from: addDays(today, -1), to: addDays(today, -1) },
+    { label: 'Last 7 nights', from: addDays(today, -7), to: addDays(today, -1) },
+    { label: 'This month', from: firstOfMonth, to: today },
+    { label: 'Last month', from: `${endOfLastMonth.slice(0, 8)}01`, to: endOfLastMonth },
+  ];
+}
+
 export default function ReportsPage() {
-  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('id, name').order('name')), []);
-  const [contractorId, setContractorId] = useState('');
-  const [from, setFrom] = useState(dayKey());
-  const [to, setTo] = useState(dayKey());
+  const [from, setFrom] = useState(() => addDays(dayKey(), -1));
+  const [to, setTo] = useState(() => addDays(dayKey(), -1));
   const [report, setReport] = useState<PatrolReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -25,13 +35,13 @@ export default function ReportsPage() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<VisitRow | null>(null);
 
-  async function run() {
-    if (!from || !to || from > to) return setError('Choose a valid start and end date.');
+  async function run(start = from, end = to) {
+    if (!start || !end || start > end) return setError('Choose a valid start and end date.');
     setBusy(true);
     setError(null);
     setReport(null);
     try {
-      const result = unwrap(await supabase.rpc('patrol_report', { p_from: from, p_to: to, p_contractor_id: contractorId || null })) as PatrolReport;
+      const result = unwrap(await supabase.rpc('patrol_report', { p_from: start, p_to: end, p_contractor_id: null })) as PatrolReport;
       setReport(result);
       setPage(0);
     } catch (e) {
@@ -39,6 +49,14 @@ export default function ReportsPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Opening Reports shows last night straight away; nothing needs to be saved.
+  useEffect(() => { void run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function pick(start: string, end: string) {
+    setFrom(start); setTo(end);
+    void run(start, end);
   }
 
   async function download(format: 'pdf' | 'csv') {
@@ -64,26 +82,25 @@ export default function ReportsPage() {
 
   const rows = report ? visitRows(report) : [];
   const totals = report ? reportTotals(report) : null;
+  const nights = report ? nightRows(report) : [];
+  const attention = nights.filter((n) => NIGHTS_NEEDING_ATTENTION.includes(n.status)).length;
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
 
   return (
     <>
-      <PageHeader title="Patrol reports" subtitle="Choose any date range. Visits after midnight stay with the date the shift started." />
+      <PageHeader title="Patrol reports" subtitle="Every scan is kept permanently, so any period can be opened at any time. Visits after midnight stay with the date the patrol started." />
       <Card className="mb-[14px]">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {quickRanges().map((r) => <Button key={r.label} size="sm" variant={from === r.from && to === r.to ? 'primary' : 'outline'} disabled={busy} onClick={() => pick(r.from, r.to)}>{r.label}</Button>)}
+        </div>
         <div className="flex flex-wrap items-end gap-3">
           <Field label="From date"><Input type="date" disabled={busy} value={from} onChange={(e) => { setFrom(e.target.value); setReport(null); }} /></Field>
           <Field label="To date"><Input type="date" disabled={busy} value={to} min={from} onChange={(e) => { setTo(e.target.value); setReport(null); }} /></Field>
-          <Field label="Contractor">
-            <Select disabled={busy} value={contractorId} onChange={(e) => { setContractorId(e.target.value); setReport(null); }}>
-              <option value="">All contractors</option>
-              {contractors.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </Field>
           <Button icon={Play} loading={busy} onClick={() => void run()}>Generate report</Button>
           <Button variant="secondary" icon={FileDown} disabled={!report || exporting} onClick={() => void download('pdf')}>PDF</Button>
           <Button variant="outline" icon={FileDown} disabled={!report || exporting} onClick={() => void download('csv')}>Excel / CSV</Button>
         </div>
-        <ErrorNote message={error ?? contractors.error} />
+        <ErrorNote message={error} />
       </Card>
       {report && totals ? (
         <>
@@ -94,6 +111,19 @@ export default function ReportsPage() {
             <StatCard icon={ClipboardList} label="Unvisited after shift end" value={totals.unvisited} hint={`${totals.remaining} not yet visited in open shifts`} />
             <StatCard icon={FileDown} label="Missing attachments" value={totals.missingAttachments} hint="Evidence still awaiting upload or recovery" />
           </div>
+          <Card title="Nights" className="mb-[14px]">
+            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} nights need a supervisor's explanation: no patrol recorded, missed, or not every location verified.` : 'No nights need an explanation.'}</p>
+            <Table head={['Night of', 'Result', 'Verified / required', 'Guard on duty']}>
+              {nights.map((n) => (
+                <tr key={n.date}>
+                  <Td>{n.date}</Td>
+                  <Td><Badge label={n.status} tone={n.status === 'Completed' ? 'brand' : NIGHTS_NEEDING_ATTENTION.includes(n.status) ? 'warning' : 'neutral'} /></Td>
+                  <Td>{n.required ? `${n.verified} / ${n.required}` : '–'}</Td>
+                  <Td>{n.guards.join(', ') || '–'}</Td>
+                </tr>
+              ))}
+            </Table>
+          </Card>
           <Card title="Shift log" className="mb-[14px]">
             <Table head={['Shift date', 'Guard on duty', 'Route', 'Shift status', 'Actual start / end']}>
               {report.shifts.map((s) => (

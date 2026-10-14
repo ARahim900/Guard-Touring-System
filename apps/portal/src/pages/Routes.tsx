@@ -6,22 +6,20 @@ import { toast } from 'sonner';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, PageHeader, Select, Spinner, Textarea } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
-import type { Checkpoint, Contractor, Route, RouteCheckpoint } from '@/lib/types';
+import type { Checkpoint, Route, RouteCheckpoint } from '@/lib/types';
 import { unwrap, useAsync } from '@/lib/useAsync';
 
 interface Draft {
   id?: string;
   name: string;
   description: string;
-  contractor_id: string;
   active: boolean;
   items: { checkpoint_id: string }[];
 }
 
 export default function RoutesPage() {
-  const routes = useAsync(async () => unwrap(await supabase.from('routes').select('id, name, description, contractor_id, active, route_checkpoints(count)').order('name')) as Route[], []);
+  const routes = useAsync(async () => unwrap(await supabase.from('routes').select('id, name, description, active, route_checkpoints(count)').order('name')) as Route[], []);
   const checkpoints = useAsync(async () => unwrap(await supabase.from('checkpoints').select('id, name, code, nfc_uid, description, latitude, longitude, radius_m, active').order('name')) as Checkpoint[], []);
-  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('id, name, contract_ref, contact_name, contact_phone, contact_email, active').order('name')) as Contractor[], []);
 
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -32,7 +30,7 @@ export default function RoutesPage() {
   // Load the chosen route into the editor.
   useEffect(() => {
     if (selected === null) return setDraft(null);
-    if (selected === 'new') return setDraft({ name: '', description: '', contractor_id: '', active: true, items: [] });
+    if (selected === 'new') return setDraft({ name: '', description: '', active: true, items: [] });
     setLoadingDraft(true);
     (async () => {
       const r = routes.data?.find((x) => x.id === selected);
@@ -43,7 +41,6 @@ export default function RoutesPage() {
         id: r.id,
         name: r.name,
         description: r.description ?? '',
-        contractor_id: r.contractor_id ?? '',
         active: r.active,
         items: (data as RouteCheckpoint[]).map((rc) => ({ checkpoint_id: rc.checkpoint_id })),
       });
@@ -68,7 +65,7 @@ export default function RoutesPage() {
     if (!draft.items.length) return toast.error('Add at least one checkpoint.');
     setSaving(true);
     try {
-      const row = { name: draft.name.trim(), description: draft.description.trim() || null, contractor_id: draft.contractor_id || null, active: draft.active };
+      const row = { name: draft.name.trim(), description: draft.description.trim() || null, active: draft.active };
       let routeId = draft.id;
       if (routeId) {
         unwrap(await supabase.from('routes').update(row).eq('id', routeId).select('id'));
@@ -136,15 +133,7 @@ export default function RoutesPage() {
             <EmptyState icon={RouteIcon} title="Select a route" message="Choose a route on the left, or create a new one." />
           ) : (
             <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Route name"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Marina night patrol" /></Field>
-                <Field label="Contractor (optional)">
-                  <Select value={draft.contractor_id} onChange={(e) => setDraft({ ...draft, contractor_id: e.target.value })}>
-                    <option value="">Any</option>
-                    {contractors.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Select>
-                </Field>
-              </div>
+              <Field label="Route name"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Marina night patrol" /></Field>
               <Field label="Description (optional)"><Textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /> Active

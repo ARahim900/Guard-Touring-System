@@ -108,7 +108,8 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
             <h2 className="mb-3 text-lg">Your locations</h2>
             {!checkpoints.length ? <p>Your manager needs to add the patrol locations.</p> : null}
             <ul className="divide-y divide-border">
-              {checkpoints.map((checkpoint) => {
+              {/* Still to visit first; verified locations drop to the bottom. */}
+              {[...checkpoints].sort((a, b) => Number(a.completed) - Number(b.completed)).map((checkpoint) => {
                 const waiting = pending.some((receipt) => receipt.shiftId === shift?.id && receipt.checkpointId === checkpoint.checkpoint_id);
                 const label = checkpoint.completed ? `Verified · ${formatTime(checkpoint.scanned_at ?? '')}` : waiting ? 'Pending upload'
                   : checkpoint.validation === 'flagged' ? 'Awaiting supervisor review' : checkpoint.validation === 'rejected' ? 'Rejected — scan again at the location' : shift?.status === 'active' ? 'Not yet visited' : 'Ready to scan when you start';

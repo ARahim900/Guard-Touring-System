@@ -248,3 +248,16 @@ test('start now retains guard-name, account-role and inactive-account checks',as
   await asUser(null);await db.exec('set role anon');
   await assert.rejects(db.query("select public.start_patrol_now('Sample guard')"),/permission denied/);
 });
+
+test('start now reuses tonight\'s prepared shift and records the server time, not the phone time',async()=>{
+  await setup();
+  const prepared=(await nights())[0];
+  await asUser(guard);
+  const id=(await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id;
+  assert.equal(id,prepared.id,'no second shift is created');
+  const shift=(await db.query('select status,actual_start,on_duty_name from public.shifts where id=$1',[id])).rows[0];
+  assert.equal(shift.status,'active');
+  assert.equal(shift.on_duty_name,'Sample guard');
+  assert.equal(new Date(shift.actual_start).toISOString(),'2026-12-31T18:00:00.000Z');
+  await assert.rejects(db.query("select public.start_patrol_now('Typed name')"),/guard list/);
+});

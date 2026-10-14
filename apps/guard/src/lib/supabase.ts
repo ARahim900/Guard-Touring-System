@@ -3,21 +3,32 @@
 // =============================================================================
 // * The anon key is public by design. Security comes from the database's
 //   Row Level Security policies, which check the logged-in user's token.
-// * The login session is saved in AsyncStorage so the guard stays signed in
-//   after closing the app (and so the background location task can upload).
+// * The login session is saved on the phone, encrypted (see
+//   secureSessionStorage.ts), so the guard stays signed in after closing the
+//   app (and so the background location task can upload).
 // * Supabase tokens expire after about an hour. autoRefreshToken renews them,
 //   but only while the app is in the foreground, so we pause/resume it with
 //   the app state (this is Supabase's recommended pattern for React Native).
 // =============================================================================
 import 'react-native-url-polyfill/auto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type Session } from '@supabase/supabase-js';
 import { AppState } from 'react-native';
 
 import { env } from './env';
+import { secureSessionStorage } from './secureSessionStorage';
 
 /** Where the login session is saved on the phone (read directly when offline). */
 export const AUTH_STORAGE_KEY = 'mbpatrol-auth';
+
+/** The saved login session, read straight from the phone (no network). */
+export async function readSavedSession(): Promise<Session | null> {
+  try {
+    const raw = await secureSessionStorage.getItem(AUTH_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Android's network layer has no time limit of its own: on one bar of signal a
@@ -36,7 +47,7 @@ export const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
   global: { fetch: fetchWithTimeout },
   auth: {
     storageKey: AUTH_STORAGE_KEY,
-    storage: AsyncStorage,
+    storage: secureSessionStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false, // no web redirects in a native app

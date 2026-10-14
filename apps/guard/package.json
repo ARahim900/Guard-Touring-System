@@ -12,8 +12,12 @@
     "build:dev:android": "eas build --profile development --platform android",
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:prod": "eas build --profile production --platform all",
+    "build:ios": "eas build --profile production --platform ios",
+    "build:apk": "eas build --profile production-apk --platform android",
     "submit:android": "eas submit --platform android --latest",
-    "submit:ios": "eas submit --platform ios --latest"
+    "submit:ios": "eas submit --platform ios --latest",
+    "update:production": "eas update --channel production --environment production --message",
+    "update:preview": "eas update --channel preview --environment preview --message"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",
@@ -21,6 +25,7 @@
     "@react-native-community/netinfo": "12.0.1",
     "@sentry/react-native": "~7.11.0",
     "@supabase/supabase-js": "^2.117.3",
+    "aes-js": "^3.1.2",
     "expo": "~57.0.27",
     "expo-application": "~57.0.3",
     "expo-audio": "~57.0.5",
@@ -31,16 +36,18 @@
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-haptics": "~57.0.3",
-    "expo-image-manipulator": "~57.0.21",
     "expo-image": "~57.0.5",
+    "expo-image-manipulator": "~57.0.21",
     "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.12",
     "expo-location": "~57.0.20",
     "expo-router": "~57.0.25",
+    "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "expo-task-manager": "~57.0.21",
+    "expo-updates": "~57.0.25",
     "lucide-react-native": "^1.55.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -55,6 +62,7 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@types/aes-js": "^3.1.4",
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   }

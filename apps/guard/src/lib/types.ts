@@ -19,9 +19,7 @@ export interface Profile {
   employee_no: string | null;
   phone: string | null;
   role: UserRole;
-  contractor_id: string | null;
   active: boolean;
-  contractors?: { name: string } | null;
 }
 
 export interface Shift {

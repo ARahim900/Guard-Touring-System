@@ -141,11 +141,10 @@ npm run dev                    # open http://localhost:5173 and sign in as the a
 The public privacy policy is then at `https://<your-site>/privacy`. The app stores need this address.
 
 ### 3.3 First data (in the portal, in this order)
-1. **Contractors**: add each security company.
-2. **Guards & users**: create the **one shared security login** (e.g. security@muscatbay.com, role Guard, linked to the contractor). The portal suggests a temporary password. Share it in person with the security team leader only. Each guard types their own name at Start shift.
-3. **Checkpoints**: create them on site (see Part 5).
-4. **Routes**: put checkpoints in order and set "due at shift start + N min".
-5. **Schedules**: create shifts. Use "Repeat for N days" to fill a month quickly.
+1. **Guards & users**: create the **one shared security login** (e.g. security@muscatbay.com, role Guard). The portal suggests a temporary password. Share it in person with the security team leader only. Each guard taps their own name from the guard list (Night patrol → Manage team) to start a patrol.
+2. **Checkpoints**: create them on site (see Part 5).
+3. **Routes**: put checkpoints in order and set "due at shift start + N min".
+4. **Schedules**: create shifts. Use "Repeat for N days" to fill a month quickly.
 
 ---
 
@@ -157,7 +156,7 @@ NFC, background location and Sentry use native code that the general-purpose **E
 ### 4.2 Accounts you need
 - **Expo** account (free): https://expo.dev/signup
 - **Apple Developer Program** (USD 99/year), for iPhone builds and the App Store.
-- **Google Play Console** (USD 25 once), for the Play Store.
+- No Google Play account: Android phones install the app directly from an APK file (see 4.6).
 
 ### 4.3 Install and link
 ```bash
@@ -168,7 +167,7 @@ npm install -g eas-cli
 eas login
 eas init                        # creates the Expo project and prints its ID
 ```
-`eas init` prints a **project ID**. Paste it into `apps/guard/app.config.ts`, replacing `PASTE-EAS-PROJECT-ID-HERE`.
+`eas init` prints a **project ID**. Paste it into `apps/guard/app.config.ts`, replacing `PASTE-EAS-PROJECT-ID-HERE`. Automatic updates (4.7) stay switched off until the project ID is set.
 
 ### 4.4 Give the cloud build its settings
 `.env` stays on your computer, so EAS needs its own copy of the public values. Run this once per environment (`development`, `preview`, `production`):
@@ -191,13 +190,25 @@ eas build --profile development --platform ios       # needs Apple Developer; re
 npx expo start --dev-client                          # then open the installed app; it connects to your computer
 ```
 
-### 4.6 Production builds and store submission
+### 4.6 Production builds
 ```bash
-eas build --profile production --platform all
-eas submit --platform android --latest     # goes to the Play "internal testing" track first
-eas submit --platform ios --latest         # goes to TestFlight
+eas build --profile production-apk --platform android   # Android: an APK to install directly on each guard phone
+eas build --profile production --platform ios            # iPhone: the first run asks for your Apple ID and creates the certificates
+eas submit --platform ios --latest                       # uploads to TestFlight
 ```
+No Mac is needed; both builds run in Expo's cloud. Installing the APK and inviting TestFlight testers are described in the checklist.
 Before submitting, work through [the store checklist](03-store-submission-checklist.md).
+
+### 4.7 Send an update to the phones (no new build)
+Changes that touch only the app's JavaScript (screens, wording, rules, bug fixes) reach the phones without a new build, through **EAS Update**:
+```bash
+cd apps/guard
+npm run update:preview -- "Short description"      # test phones with a preview build first
+npm run update:production -- "Short description"   # all guard phones (APK and TestFlight)
+# the same as: eas update --channel production --environment production --message "Short description"
+```
+Each phone downloads the update in the background and uses it the next time the app starts. It never restarts during a patrol.
+A change to native code (a new native library or permission, an Expo SDK upgrade) needs a new build instead: raise `APP_VERSION` in `app.config.ts`, build again (4.6), and tell the Android phones as described in the [checklist, 3.3](03-store-submission-checklist.md#33-android-direct-apk-installation-no-google-play).
 
 ---
 
@@ -205,7 +216,11 @@ Before submitting, work through [the store checklist](03-store-submission-checkl
 
 ### 5.1 Place each checkpoint accurately
 Scans more than the checkpoint radius (default **30 m**) away are **rejected**. So GPS placement matters.
-- Best: stand at the checkpoint with a phone or tablet, open the portal's **Checkpoints** page, choose **New checkpoint** → **Use my location**.
+- Quickest for many locations: add them by name (they show **Not placed** and stay inactive), then open **Locations → Place locations**:
+  - **On the map** (no site visit): choose a location, zoom right in on the satellite view and tap the exact spot where its label is (drag the pin to adjust), or paste coordinates from Google Maps (press and hold the spot, copy the numbers). Save: the location goes live and the next one is selected.
+  - **Scan on site**: fix the label, stand next to it in the open and scan it; the phone's GPS position is saved. A label that is already placed is only moved after you confirm.
+  - Print the labels with **QR codes / print** and fix each one at the exact spot you pinned: guards must be within the radius (30 m) when they scan.
+- One at a time: stand at the checkpoint with a phone or tablet, open the portal's **Checkpoints** page, choose **New checkpoint** → **Use my location**.
 - Indoors (pump rooms, plant rooms, basements) GPS is often 20–60 m out. Choose one:
   - set the checkpoint position at the room entrance, or
   - raise that checkpoint's radius to 50–80 m, or
@@ -218,9 +233,9 @@ Scans more than the checkpoint radius (default **30 m**) away are **rejected**. 
 ### 5.3 Acceptance test (sign off each line)
 | # | Test | Expected |
 |---|---|---|
-| 1 | Guard logs in; Work tab shows today's shift and route | Checkpoints listed with due times |
-| 2 | Personal → type your full name (and ID) → Start shift; allow location "All the time" | Status "On shift"; Work tab shows "On duty: name"; portal live map shows that name within 2 min |
-| 2a | Try Start shift with the name left empty | App refuses: name required |
+| 1 | Guard logs in; Work tab shows "Who is on duty?" with the four guard names | Start patrol stays disabled until a name is tapped |
+| 2 | Tap your name → Start patrol; allow location "All the time" | Work tab shows "On duty: name" and the required locations; portal live map shows that name within 2 min |
+| 2a | Turn on airplane mode before starting | Start patrol is disabled with "Starting a patrol needs mobile data or Wi-Fi" |
 | 3 | Scan QR at a checkpoint → Normal → Save | Toast "saved"; Work tab ticks it; portal Scan records shows **Valid** |
 | 4 | Scan the same label 100 m away | Saved, but portal shows **Rejected – too far** and an alarm |
 | 5 | Airplane mode → scan 2 checkpoints with photos | "Saved offline" and "Pending upload"; turn data on → uploads automatically |
@@ -229,8 +244,8 @@ Scans more than the checkpoint radius (default **30 m**) away are **rejected**. 
 | 8 | Hold SOS for 2 s | Portal sounds an alarm, shows a pop-up, and a red marker at the guard's position |
 | 9 | Skip a checkpoint past its due time + 15 min | "Missed checkpoint" alarm within 5 min |
 | 10 | Android: enable a fake-GPS app, then scan | **Rejected – fake GPS** |
-| 11 | End shift | Tracking notification disappears; live map drops the guard |
-| 12 | Reports → contractor → month → Download PDF | PDF with completion, punctuality and the daily patrol log naming the guard on duty each day |
+| 11 | Wait for the shift end time (or test with a short shift) | The patrol closes by itself; tracking notification disappears; live map drops the guard |
+| 12 | Reports → choose the dates → Generate report → PDF | PDF with completion, punctuality and the daily patrol log naming the guard on duty each day |
 
 ## Everyday commands
 

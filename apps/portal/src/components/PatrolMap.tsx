@@ -169,3 +169,14 @@ export function ClickToPick({ onPick }: { onPick: (lat: number, lng: number) => 
   useMapEvents({ click: (e) => onPick(e.latlng.lat, e.latlng.lng) });
   return null;
 }
+
+/** Moves the map to a point whenever `target` changes (e.g. another location is chosen). */
+export function FlyTo({ target, zoom = 18 }: { target: [number, number] | null; zoom?: number }) {
+  const map = useMap();
+  const lat = target?.[0];
+  const lng = target?.[1];
+  useEffect(() => {
+    if (lat !== undefined && lng !== undefined) map.flyTo([lat, lng], zoom, { duration: 0.6 });
+  }, [map, lat, lng, zoom]);
+  return null;
+}

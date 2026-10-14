@@ -14,6 +14,9 @@ const reasons: Record<string, string> = {
   shift_not_started: 'The patrol had not started. Start your patrol before scanning.',
   outside_shift: 'The scan was outside your shift hours. Refresh to check your current patrol.',
   late: 'This scan was later than the planned visit time. Your supervisor can review it.',
+  impossible_travel: 'Your position jumped further than anyone could travel since your last scan. Your supervisor will review this visit.',
+  repeated_position: 'This scan has exactly the same GPS position as a scan at another location. Your supervisor will review this visit.',
+  fast_round: 'This round was finished faster than the minimum round time. Your supervisor will review this visit.',
 };
 
 export function scanFeedback(receipt: PatrolReceipt) {

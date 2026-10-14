@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ScanDetail } from '@/components/ScanDetail';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, Spinner, Table, Td } from '@/components/ui';
 import { FLAG_LABELS, VALIDATION, guardName } from '@/lib/labels';
+import { csvCell } from '@/lib/patrolReport';
 import { supabase } from '@/lib/supabase';
 import { addDays, dayKey, dayRange, formatDateTime } from '@/lib/time';
 import type { Profile, Scan } from '@/lib/types';
@@ -43,7 +44,7 @@ export default function ScansPage() {
         s.is_on_time === null ? '' : s.is_on_time ? 'Yes' : 'No', s.distance_m ?? '', s.accuracy_m ?? '', s.flags.join(' '), s.note ?? '',
       ]),
     ];
-    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const csv = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
     const a = Object.assign(document.createElement('a'), { href: url, download: `scans_${from}_${to}.csv` });
     a.click();

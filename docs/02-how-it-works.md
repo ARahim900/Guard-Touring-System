@@ -63,6 +63,9 @@ Scans and attachments **cannot be deleted** by anyone through the apps. They are
 | Phone clock within 5 min of the server | `clock_drift` | flagged (still counts) |
 | GPS accuracy ≤ 50 m | `low_accuracy` | flagged (still counts) |
 | Shift was started in the app | `shift_not_started` | flagged (still counts) |
+| Movement since the nearest earlier and later scan of the shift is no faster than 80 km/h (rejected and low-accuracy readings are ignored) | `impossible_travel` | flagged (awaiting review, never rejected) |
+| Position is not exactly the same as a scan at another checkpoint of the shift | `repeated_position` | flagged (awaiting review, never rejected) |
+| Round took at least the minimum round time (off by default) | `fast_round` | flagged (awaiting review, never rejected) |
 | Scanned before due time + 15 min grace | `late` | counts, but lowers punctuality |
 
    **Rejected** scans are still **stored** (never discard evidence). They do not count towards completion, and they raise a `scan_rejected` alarm. A supervisor can override any verdict, with a mandatory reason.
@@ -89,8 +92,8 @@ This is accurate however long the scan waited in the outbox. It also catches a g
 
 ### One shared security login: "guard on duty"
 Muscat Bay security uses **one shared login**, with one guard patrolling once a day. A login alone cannot tell us *who* patrolled, so:
-- At **Personal → Start shift** the guard must type their **full name** (required) and, optionally, an **employee / ID number**. The field is never prefilled, so yesterday's name cannot carry over by accident.
-- The name is stored on the shift (`shifts.on_duty_name`, `on_duty_ref`) by `start_shift_as()`. **It cannot be changed afterwards** from the app; pressing Start again keeps the first name.
+- On the Work tab (app) or `/guard` page (web) the guard **taps their name** from the guard list the supervisor keeps under Night patrol. Nothing is prefilled, so yesterday's name cannot carry over by accident, and the server refuses any name not on the list.
+- `start_patrol_now()` starts the patrol on the **server clock**, reuses the shift the nightly schedule prepared (or creates one), and stores the name on the shift (`shifts.on_duty_name`). **It cannot be changed afterwards** from the app; pressing Start again keeps the first name.
 - Every scan, alarm, SOS, incident, the live map and the reports show this name. Records from before this change fall back to the login's name.
 - **Reports → daily patrol log** lists one row per day: date, guard on duty, ID, route, visited / due, on time, incidents and SOS. It is also in the PDF.
 - Limit to be aware of: the name is typed, not verified. A supervisor should check it against the duty roster. For stronger proof, give each guard their own login later; the system already supports that.
@@ -110,12 +113,12 @@ Muscat Bay security uses **one shared login**, with one guard patrolling once a 
 - The portal receives new alarms through **Realtime**, a WebSocket the server pushes to. Supervisors get a pop-up and a sound within a second, on any page. SOS pop-ups stay on screen for a minute.
 
 ## 2.6 Background location
-- Tracking runs **only** between Start shift and End shift.
+- Tracking runs **only** while a patrol is active. Guards never finish a patrol by hand: it closes by itself at the end of the shift (night shift end time, or 12 hours after the start if no hours are saved), and tracking stops then.
   - **Android** shows a permanent "Patrol shift in progress" notification (a foreground service). Android requires it, and it is honest to the guard.
   - **iOS** shows the blue location indicator.
 - Points are recorded about once a minute, or every 25 m moved. They go to the outbox first, then upload in batches.
 - If the phone restarts during a shift, tracking resumes the next time the app opens.
-- Google Play requires an in-app explanation **before** the background permission prompt. The app shows it when the guard taps Start shift.
+- Android policy expects an in-app explanation **before** the background permission prompt. The app shows it when the guard taps Start patrol.
 
 ## 2.7 Statistics (identical everywhere)
 `patrol_stats()` is one server function, used by the guard's Statistic tab, the portal and the monthly PDF, so the numbers always agree.
@@ -131,7 +134,9 @@ update public.app_settings set
   max_clock_drift_sec = 300,       -- phone clock tolerance
   max_gps_accuracy_m = 50,         -- poorer accuracy is flagged
   shift_early_start_minutes = 30,  -- how early a guard may start
-  location_retention_days = 90     -- privacy: GPS trail kept for this long
+  location_retention_days = 90,    -- privacy: GPS trail kept for this long
+  max_patrol_speed_kmh = 80,       -- faster movement between scans is flagged impossible_travel; null turns the check off
+  min_round_minutes = null         -- a faster full round is flagged fast_round; null (default) turns the check off
 where id = 1;
 ```
 The radius is set **per checkpoint** on the portal's Checkpoints page (default 30 m).

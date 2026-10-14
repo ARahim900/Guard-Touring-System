@@ -92,12 +92,11 @@ export default function PersonalScreen() {
       <Card>
         <Info label="Email" value={profile?.email} />
         <Info label="Employee no." value={profile?.employee_no} />
-        <Info label="Contractor" value={profile?.contractors?.name} />
         <TextField
           label="Account name"
           value={fullName}
           onChangeText={setFullName}
-          hint="The name of this login. Your own name is entered at Start shift."
+          hint="The name of this login. Your own name is chosen when you start a patrol."
         />
         <TextField label="Mobile number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" />
         <Button title="Save profile" icon={Save} variant="outline" onPress={saveProfile} loading={savingProfile} />

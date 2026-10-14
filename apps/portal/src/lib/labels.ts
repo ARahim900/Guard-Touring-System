@@ -17,6 +17,9 @@ export const FLAG_LABELS: Record<string, string> = {
   shift_not_started: 'Shift not started',
   checkpoint_inactive: 'Checkpoint retired',
   shift_cancelled: 'Shift cancelled',
+  impossible_travel: 'Moved impossibly fast',
+  repeated_position: 'Same GPS as another checkpoint',
+  fast_round: 'Round finished too fast',
 };
 
 export const VALIDATION: Record<ScanValidation, { label: string; tone: Tone }> = {

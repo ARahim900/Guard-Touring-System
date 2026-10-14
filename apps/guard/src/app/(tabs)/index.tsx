@@ -2,12 +2,13 @@
 // WORK tab: today's shift, the assigned route, and each checkpoint's status.
 // =============================================================================
 import { router } from 'expo-router';
-import { CalendarClock, CheckCircle2, Circle, CloudUpload, MapPin, XCircle } from 'lucide-react-native';
+import { CheckCircle2, Circle, CloudUpload, MapPin, XCircle } from 'lucide-react-native';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ShiftControls } from '@/components/ShiftControls';
 import { SosButton } from '@/components/SosButton';
 import { SyncBanner } from '@/components/SyncBanner';
+import { UpdateNotice } from '@/components/UpdateNotice';
 import { AppText, Badge, Button, Card, EmptyState, LoadingView, ProgressBar, Screen, SectionTitle } from '@/components/ui';
 import { useAuth } from '@/context/AuthProvider';
 import { useShift, type CheckpointView } from '@/context/ShiftProvider';
@@ -57,19 +58,14 @@ export default function WorkScreen() {
 
       <Button title="Account and settings" variant="ghost" onPress={() => router.navigate('/personal')} />
       <SyncBanner />
+      <UpdateNotice />
       {fromCache && updatedAt ? (
         <AppText variant="caption">Showing saved data from {formatDateTime(updatedAt)}. Pull down to refresh.</AppText>
       ) : null}
       {error && !fromCache ? <AppText variant="label" style={{ color: colors.dangerText }}>{error}</AppText> : null}
 
       {!shift ? (
-        <Card>
-          <EmptyState
-            icon={CalendarClock}
-            title="No shift assigned"
-            message="You have no shift today. Pull down to refresh, or contact your supervisor."
-          />
-        </Card>
+        <ShiftControls />
       ) : (
         <>
           <Card>
@@ -107,7 +103,8 @@ export default function WorkScreen() {
             </Card>
           ) : (
             <Card style={{ padding: 0, gap: 0 }}>
-              {checkpoints.map((cp, i) => {
+              {/* Still to visit first; verified locations drop to the bottom. */}
+              {[...checkpoints].sort((a, b) => Number(a.completed) - Number(b.completed)).map((cp, i) => {
                 const st = checkpointState(cp);
                 return (
                   <View
