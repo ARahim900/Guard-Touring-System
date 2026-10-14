@@ -4,13 +4,12 @@
 // Accounts are created by supervisors (no "Sign up" in this app). This app is
 // for guards only: supervisor/admin accounts are sent to the web portal.
 // =============================================================================
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isAuthRetryableFetchError, type Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { friendlyError } from '@/lib/errors';
 import { Sentry } from '@/lib/sentry';
-import { AUTH_STORAGE_KEY, supabase } from '@/lib/supabase';
+import { readSavedSession, supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 import { clearCache, readCache, writeCache } from '@/offline/cache';
 import { clearOutbox } from '@/offline/outbox';
@@ -31,7 +30,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, email, employee_no, phone, role, contractor_id, active, contractors(name)')
+    .select('id, full_name, email, employee_no, phone, role, active')
     .eq('id', userId)
     .single();
   if (error) {
@@ -68,8 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // session", although the saved session is still there. Keep the guard signed
       // in so they can scan offline; the token is refreshed once signal returns.
       if (!s && error && isAuthRetryableFetchError(error)) {
-        const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEY).catch(() => null);
-        s = raw ? (JSON.parse(raw) as Session) : null;
+        s = await readSavedSession();
       }
       setSession(s);
       await loadProfile(s); // falls back to the cached profile when offline

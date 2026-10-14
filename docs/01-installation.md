@@ -141,11 +141,10 @@ npm run dev                    # open http://localhost:5173 and sign in as the a
 The public privacy policy is then at `https://<your-site>/privacy`. The app stores need this address.
 
 ### 3.3 First data (in the portal, in this order)
-1. **Contractors**: add each security company.
-2. **Guards & users**: create the **one shared security login** (e.g. security@muscatbay.com, role Guard, linked to the contractor). The portal suggests a temporary password. Share it in person with the security team leader only. Each guard taps their own name from the guard list (Night patrol → Manage team) to start a patrol.
-3. **Checkpoints**: create them on site (see Part 5).
-4. **Routes**: put checkpoints in order and set "due at shift start + N min".
-5. **Schedules**: create shifts. Use "Repeat for N days" to fill a month quickly.
+1. **Guards & users**: create the **one shared security login** (e.g. security@muscatbay.com, role Guard). The portal suggests a temporary password. Share it in person with the security team leader only. Each guard taps their own name from the guard list (Night patrol → Manage team) to start a patrol.
+2. **Checkpoints**: create them on site (see Part 5).
+3. **Routes**: put checkpoints in order and set "due at shift start + N min".
+4. **Schedules**: create shifts. Use "Repeat for N days" to fill a month quickly.
 
 ---
 
@@ -168,7 +167,7 @@ npm install -g eas-cli
 eas login
 eas init                        # creates the Expo project and prints its ID
 ```
-`eas init` prints a **project ID**. Paste it into `apps/guard/app.config.ts`, replacing `PASTE-EAS-PROJECT-ID-HERE`.
+`eas init` prints a **project ID**. Paste it into `apps/guard/app.config.ts`, replacing `PASTE-EAS-PROJECT-ID-HERE`. Automatic updates (4.7) stay switched off until the project ID is set.
 
 ### 4.4 Give the cloud build its settings
 `.env` stays on your computer, so EAS needs its own copy of the public values. Run this once per environment (`development`, `preview`, `production`):
@@ -199,6 +198,17 @@ eas submit --platform ios --latest                       # uploads to TestFlight
 ```
 No Mac is needed; both builds run in Expo's cloud. Installing the APK and inviting TestFlight testers are described in the checklist.
 Before submitting, work through [the store checklist](03-store-submission-checklist.md).
+
+### 4.7 Send an update to the phones (no new build)
+Changes that touch only the app's JavaScript (screens, wording, rules, bug fixes) reach the phones without a new build, through **EAS Update**:
+```bash
+cd apps/guard
+npm run update:preview -- "Short description"      # test phones with a preview build first
+npm run update:production -- "Short description"   # all guard phones (APK and TestFlight)
+# the same as: eas update --channel production --environment production --message "Short description"
+```
+Each phone downloads the update in the background and uses it the next time the app starts. It never restarts during a patrol.
+A change to native code (a new native library or permission, an Expo SDK upgrade) needs a new build instead: raise `APP_VERSION` in `app.config.ts`, build again (4.6), and tell the Android phones as described in the [checklist, 3.3](03-store-submission-checklist.md#33-android-direct-apk-installation-no-google-play).
 
 ---
 
@@ -231,7 +241,7 @@ Scans more than the checkpoint radius (default **30 m**) away are **rejected**. 
 | 9 | Skip a checkpoint past its due time + 15 min | "Missed checkpoint" alarm within 5 min |
 | 10 | Android: enable a fake-GPS app, then scan | **Rejected – fake GPS** |
 | 11 | End shift | Tracking notification disappears; live map drops the guard |
-| 12 | Reports → contractor → month → Download PDF | PDF with completion, punctuality and the daily patrol log naming the guard on duty each day |
+| 12 | Reports → choose the dates → Generate report → PDF | PDF with completion, punctuality and the daily patrol log naming the guard on duty each day |
 
 ## Everyday commands
 

@@ -63,6 +63,9 @@ Scans and attachments **cannot be deleted** by anyone through the apps. They are
 | Phone clock within 5 min of the server | `clock_drift` | flagged (still counts) |
 | GPS accuracy ≤ 50 m | `low_accuracy` | flagged (still counts) |
 | Shift was started in the app | `shift_not_started` | flagged (still counts) |
+| Movement since the nearest earlier and later scan of the shift is no faster than 80 km/h (rejected and low-accuracy readings are ignored) | `impossible_travel` | flagged (awaiting review, never rejected) |
+| Position is not exactly the same as a scan at another checkpoint of the shift | `repeated_position` | flagged (awaiting review, never rejected) |
+| Round took at least the minimum round time (off by default) | `fast_round` | flagged (awaiting review, never rejected) |
 | Scanned before due time + 15 min grace | `late` | counts, but lowers punctuality |
 
    **Rejected** scans are still **stored** (never discard evidence). They do not count towards completion, and they raise a `scan_rejected` alarm. A supervisor can override any verdict, with a mandatory reason.
@@ -131,7 +134,9 @@ update public.app_settings set
   max_clock_drift_sec = 300,       -- phone clock tolerance
   max_gps_accuracy_m = 50,         -- poorer accuracy is flagged
   shift_early_start_minutes = 30,  -- how early a guard may start
-  location_retention_days = 90     -- privacy: GPS trail kept for this long
+  location_retention_days = 90,    -- privacy: GPS trail kept for this long
+  max_patrol_speed_kmh = 80,       -- faster movement between scans is flagged impossible_travel; null turns the check off
+  min_round_minutes = null         -- a faster full round is flagged fast_round; null (default) turns the check off
 where id = 1;
 ```
 The radius is set **per checkpoint** on the portal's Checkpoints page (default 30 m).

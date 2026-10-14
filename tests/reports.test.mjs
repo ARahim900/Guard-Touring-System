@@ -34,6 +34,14 @@ test('CSV preserves unknown readings, quotes and spreadsheet formula safety', ()
   assert.ok(csv.includes('"","",""'));
 });
 
+test('CSV starts with the shift date and never mentions contractors', () => {
+  const csv = buildReportCsv(report([shift({checkpoints:[{id:'a',name:'A',sequence:1,scans:[]}]})]));
+  const [head, row] = csv.replace('﻿', '').split('\r\n');
+  assert.ok(head.startsWith('"Shift date",'));
+  assert.ok(row.startsWith('"2026-09-10",'));
+  assert.doesNotMatch(csv, /contractor/i);
+});
+
 test('large report and empty routes are retained without pagination loss', () => {
   const data = report([shift({checkpoints:Array.from({length:1201},(_,i)=>({id:String(i),name:`Test ${i}`,sequence:i+1,scans:[]}))}),shift({id:'empty'})]);
   assert.equal(visitRows(data).length,1201);

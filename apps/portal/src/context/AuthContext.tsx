@@ -24,7 +24,7 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue | null>(null);
 
 async function loadProfile(userId: string) {
-  const { data, error } = await supabase.from('profiles').select('id, full_name, email, employee_no, phone, role, contractor_id, active').eq('id', userId).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('id, full_name, email, employee_no, phone, role, active').eq('id', userId).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
   if (error) throw error; // network/server problem: NOT a reason to sign anyone out
   return (data as Profile | null) ?? null;
 }

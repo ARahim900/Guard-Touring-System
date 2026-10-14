@@ -16,6 +16,7 @@ import { ActivityIndicator, Alert, Animated, Linking, Pressable, StyleSheet, Tex
 import { useAuth } from '@/context/AuthProvider';
 import { useShift } from '@/context/ShiftProvider';
 import { useToast } from '@/context/ToastProvider';
+import { whileBusy } from '@/lib/busy';
 import { env } from '@/lib/env';
 import { reportError } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
@@ -41,7 +42,12 @@ export function SosButton() {
   const progress = useRef(new Animated.Value(0)).current;
   const holdAnim = useRef<Animated.CompositeAnimation | null>(null);
 
-  async function sendSos() {
+  // Marked busy so an automatic app update never restarts the app mid-send.
+  function sendSos() {
+    return whileBusy(sendSosNow);
+  }
+
+  async function sendSosNow() {
     setSending(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
     const fix = await getFix(5000);

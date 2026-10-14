@@ -45,7 +45,6 @@ export interface PatrolReport {
   from_date: string;
   to_date: string;
   generated_at: string;
-  contractor_name: string | null;
   shifts: ReportShift[];
 }
 
@@ -141,7 +140,7 @@ export function csvCell(value: string | number | null): string {
 }
 
 export function buildReportCsv(report: PatrolReport): string {
-  const head = ['Contractor scope', 'Shift date', 'Guard on duty', 'Guard ID', 'Login', 'Route', 'Shift status', 'Scheduled start (Muscat)', 'Scheduled end (Muscat)', 'Actual start (Muscat)', 'Actual end (Muscat)', 'Automatically closed (Muscat)', 'Checkpoint', 'Visit status', 'Scan count', 'Captured time (Muscat)', 'Server received (Muscat)', 'Latitude', 'Longitude', 'GPS accuracy (m)', 'Issue notes', 'Missing attachments', 'Generated at (Muscat)'];
+  const head = ['Shift date', 'Guard on duty', 'Guard ID', 'Login', 'Route', 'Shift status', 'Scheduled start (Muscat)', 'Scheduled end (Muscat)', 'Actual start (Muscat)', 'Actual end (Muscat)', 'Automatically closed (Muscat)', 'Checkpoint', 'Visit status', 'Scan count', 'Captured time (Muscat)', 'Server received (Muscat)', 'Latitude', 'Longitude', 'GPS accuracy (m)', 'Issue notes', 'Missing attachments', 'Generated at (Muscat)'];
   const rows: (string | number | null)[][] = visitRows(report).map(({ shift: s, checkpoint: c, scan, status }) => [
     s.patrol_date, s.guard_name ?? 'Unconfirmed', s.guard_ref, s.login_name, s.route_name, s.status,
     evidenceTime(s.scheduled_start), evidenceTime(s.scheduled_end), evidenceTime(s.actual_start), evidenceTime(s.actual_end),
@@ -157,5 +156,5 @@ export function buildReportCsv(report: PatrolReport): string {
       evidenceTime(s.scheduled_start), evidenceTime(s.scheduled_end), evidenceTime(s.actual_start), evidenceTime(s.actual_end),
       s.auto_closed_at ? evidenceTime(s.auto_closed_at) : '', 'No checkpoints configured', '', 0, '', '', null, null, null, '', 0, evidenceTime(report.generated_at)]);
   }
-  return '\uFEFF' + [head, ...rows.map((row) => [report.contractor_name ?? 'All contractors', ...row])].map((row) => row.map(csvCell).join(',')).join('\r\n');
+  return '\uFEFF' + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }

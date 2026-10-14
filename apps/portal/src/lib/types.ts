@@ -7,16 +7,6 @@ export type AlarmStatus = 'open' | 'acknowledged' | 'resolved';
 export type IncidentStatus = 'open' | 'in_progress' | 'resolved';
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
 
-export interface Contractor {
-  id: string;
-  name: string;
-  contract_ref: string | null;
-  contact_name: string | null;
-  contact_phone: string | null;
-  contact_email: string | null;
-  active: boolean;
-}
-
 export interface Profile {
   id: string;
   full_name: string;
@@ -24,9 +14,7 @@ export interface Profile {
   employee_no: string | null;
   phone: string | null;
   role: UserRole;
-  contractor_id: string | null;
   active: boolean;
-  contractors?: { name: string } | null;
 }
 
 export interface Checkpoint {
@@ -45,7 +33,6 @@ export interface Route {
   id: string;
   name: string;
   description: string | null;
-  contractor_id: string | null;
   active: boolean;
   route_checkpoints?: { count: number }[];
 }

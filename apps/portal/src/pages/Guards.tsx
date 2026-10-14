@@ -2,7 +2,7 @@
 // Guards & users. Logins are created here (there is no self sign-up).
 // Creating a login, resetting a password and disabling an account go through
 // the "admin-users" Edge Function, which holds the powerful service key on
-// the server. Name, phone, employee number and contractor are saved directly
+// the server. Name, phone and employee number are saved directly
 // (protected by Row Level Security).
 // =============================================================================
 import { KeyRound, Pencil, Plus, UserCheck, UserX, Users } from 'lucide-react';
@@ -13,7 +13,7 @@ import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHe
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
-import type { Contractor, Profile, UserRole } from '@/lib/types';
+import type { Profile, UserRole } from '@/lib/types';
 import { unwrap, useAsync } from '@/lib/useAsync';
 
 /** Call the admin-users Edge Function and surface its error message. */
@@ -46,7 +46,6 @@ interface NewUser {
   email: string;
   password: string;
   role: UserRole;
-  contractor_id: string;
   employee_no: string;
   phone: string;
 }
@@ -61,9 +60,8 @@ export default function GuardsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('*').order('name')) as Contractor[], []);
   const { data, loading, error, reload } = useAsync(async () => {
-    let q = supabase.from('profiles').select('*, contractors(name)').order('full_name');
+    let q = supabase.from('profiles').select('*').order('full_name');
     if (roleFilter !== 'all') q = q.eq('role', roleFilter);
     if (!showInactive) q = q.eq('active', true);
     return unwrap(await q) as Profile[];
@@ -75,7 +73,7 @@ export default function GuardsPage() {
   async function create() {
     if (!creating) return;
     setBusy(true);
-    const res = await callAdmin({ action: 'create', ...creating, contractor_id: creating.contractor_id || null });
+    const res = await callAdmin({ action: 'create', ...creating });
     setBusy(false);
     if (!res.ok) return toast.error(res.error ?? 'Could not create the account.');
     toast.success(`Account created for ${creating.full_name}. Share the password securely.`);
@@ -92,7 +90,6 @@ export default function GuardsPage() {
         full_name: editing.full_name.trim(),
         phone: editing.phone?.trim() || null,
         employee_no: editing.employee_no?.trim() || null,
-        contractor_id: editing.contractor_id || null,
         ...(isAdmin ? { role: editing.role } : {}),
       })
       .eq('id', editing.id);
@@ -127,7 +124,7 @@ export default function GuardsPage() {
         title="Guards & users"
         subtitle="Create logins for guards (mobile app) and supervisors (this portal)."
         actions={
-          <Button icon={Plus} onClick={() => setCreating({ full_name: '', email: '', password: suggestPassword(), role: 'guard', contractor_id: '', employee_no: '', phone: '' })}>
+          <Button icon={Plus} onClick={() => setCreating({ full_name: '', email: '', password: suggestPassword(), role: 'guard', employee_no: '', phone: '' })}>
             New account
           </Button>
         }
@@ -152,14 +149,13 @@ export default function GuardsPage() {
         ) : !data?.length ? (
           <EmptyState icon={Users} title="No accounts" />
         ) : (
-          <Table head={['Name', 'Employee no.', 'Email', 'Phone', 'Contractor', 'Role', 'Status', '']}>
+          <Table head={['Name', 'Employee no.', 'Email', 'Phone', 'Role', 'Status', '']}>
             {data.map((p) => (
               <tr key={p.id}>
                 <Td className="font-medium">{p.full_name}</Td>
                 <Td>{p.employee_no ?? '–'}</Td>
                 <Td>{p.email}</Td>
                 <Td>{p.phone ?? '–'}</Td>
-                <Td>{p.contractors?.name ?? '–'}</Td>
                 <Td><Badge label={p.role} tone={p.role === 'guard' ? 'brand' : 'info'} /></Td>
                 <Td>{p.active ? <Badge label="Active" tone="success" /> : <Badge label="Disabled" tone="danger" />}</Td>
                 <Td className="whitespace-nowrap text-right">
@@ -206,12 +202,6 @@ export default function GuardsPage() {
                   {roles.map((r) => <option key={r} value={r}>{r}</option>)}
                 </Select>
               </Field>
-              <Field label="Contractor">
-                <Select value={creating.contractor_id} onChange={(e) => setCreating({ ...creating, contractor_id: e.target.value })}>
-                  <option value="">None (Muscat Bay staff)</option>
-                  {contractors.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-              </Field>
               <Field label="Employee no."><Input value={creating.employee_no} onChange={(e) => setCreating({ ...creating, employee_no: e.target.value })} /></Field>
               <Field label="Mobile"><Input value={creating.phone} onChange={(e) => setCreating({ ...creating, phone: e.target.value })} placeholder="+968…" /></Field>
             </div>
@@ -238,12 +228,6 @@ export default function GuardsPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Employee no."><Input value={editing.employee_no ?? ''} onChange={(e) => setEditing({ ...editing, employee_no: e.target.value })} /></Field>
               <Field label="Mobile"><Input value={editing.phone ?? ''} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} /></Field>
-              <Field label="Contractor">
-                <Select value={editing.contractor_id ?? ''} onChange={(e) => setEditing({ ...editing, contractor_id: e.target.value || null })}>
-                  <option value="">None</option>
-                  {contractors.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-              </Field>
               {isAdmin ? (
                 <Field label="Role">
                   <Select value={editing.role} onChange={(e) => setEditing({ ...editing, role: e.target.value as UserRole })} disabled={editing.id === me?.id}>

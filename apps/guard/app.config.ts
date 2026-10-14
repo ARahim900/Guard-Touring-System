@@ -11,6 +11,15 @@ const IS_DEV = process.env.APP_VARIANT === 'development';
 
 // Paste the ID printed by "eas init" here (it is not a secret).
 const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID || 'PASTE-EAS-PROJECT-ID-HERE';
+const HAS_EAS_PROJECT = !EAS_PROJECT_ID.startsWith('PASTE');
+
+// App version. Change it for every build with NATIVE changes (a new or updated
+// native library, a new permission, an Expo SDK upgrade). Updates sent with
+// "eas update" only reach builds with the same version (runtimeVersion policy
+// "appVersion"), so a phone can never receive JavaScript its native code does
+// not support. Android phones are told about a newer version through
+// app_settings.android_latest_version (see docs/03-store-submission-checklist.md).
+const APP_VERSION = '1.0.0';
 
 const LOCATION_WHEN_IN_USE =
   'MB Patrol uses your location to confirm you are at each checkpoint when you scan it, and to send your position with an SOS alert.';
@@ -27,7 +36,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'muscat-bay-patrol',
   owner: process.env.EXPO_OWNER || undefined,
   scheme: 'mbpatrol',
-  version: '1.0.0',
+  version: APP_VERSION,
+  runtimeVersion: { policy: 'appVersion' },
+  // EAS Update: the app checks for a new update each time it starts (and when it
+  // returns to the foreground, see src/components/AppUpdates.tsx), downloads it in
+  // the background and uses it from the next start. fallbackToCacheTimeout 0 means
+  // the app never waits for the network when it opens.
+  updates: HAS_EAS_PROJECT
+    ? {
+        url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+        checkAutomatically: 'ON_LOAD',
+        fallbackToCacheTimeout: 0,
+      }
+    : { enabled: false },
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
@@ -85,6 +106,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-sqlite',
     'expo-font',
+    // Keeps the encrypted login key out of Android backups (a restored key
+    // would not work). No Face ID: the app does not use biometrics.
+    ['expo-secure-store', { configureAndroidBackup: true, faceIDPermission: false }],
     [
       'expo-splash-screen',
       { image: './assets/splash-icon.png', imageWidth: 220, backgroundColor: '#FFFFFF' },
@@ -122,6 +146,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true,
   },
   extra: {
-    eas: EAS_PROJECT_ID.startsWith('PASTE') ? {} : { projectId: EAS_PROJECT_ID },
+    eas: HAS_EAS_PROJECT ? { projectId: EAS_PROJECT_ID } : {},
   },
 });

@@ -75,7 +75,6 @@ const router = createBrowserRouter([
           { path: 'routes', lazy: page(() => import('@/pages/Routes')) },
           { path: 'checkpoints', lazy: page(() => import('@/pages/Checkpoints')) },
           { path: 'guards', lazy: page(() => import('@/pages/Guards')) },
-          { path: 'contractors', lazy: page(() => import('@/pages/Contractors')) },
           { path: 'reports', lazy: page(() => import('@/pages/Reports')) },
           { path: '*', element: <Navigate to="/" replace /> },
         ],

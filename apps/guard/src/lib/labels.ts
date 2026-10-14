@@ -15,6 +15,9 @@ export const FLAG_LABELS: Record<string, string> = {
   shift_not_started: 'Shift not started',
   checkpoint_inactive: 'Checkpoint retired',
   shift_cancelled: 'Shift cancelled',
+  impossible_travel: 'Moved too fast between scans',
+  repeated_position: 'Same GPS position as another checkpoint',
+  fast_round: 'Round finished too fast',
 };
 
 export const flagText = (flags: string[]) => flags.map((f) => FLAG_LABELS[f] ?? f).join(' · ');

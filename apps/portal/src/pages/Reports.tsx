@@ -3,19 +3,17 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ScanDetail } from '@/components/ScanDetail';
-import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Select, StatCard, Table, Td } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, StatCard, Table, Td } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { NIGHTS_NEEDING_ATTENTION, buildReportCsv, coordinates, evidenceTime, nightRows, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
 import { buildReportPdf } from '@/lib/reportPdf';
 import { supabase } from '@/lib/supabase';
 import { dayKey } from '@/lib/time';
-import { unwrap, useAsync } from '@/lib/useAsync';
+import { unwrap } from '@/lib/useAsync';
 
 const PAGE_SIZE = 50;
 
 export default function ReportsPage() {
-  const contractors = useAsync(async () => unwrap(await supabase.from('contractors').select('id, name').order('name')), []);
-  const [contractorId, setContractorId] = useState('');
   const [from, setFrom] = useState(dayKey());
   const [to, setTo] = useState(dayKey());
   const [report, setReport] = useState<PatrolReport | null>(null);
@@ -31,7 +29,7 @@ export default function ReportsPage() {
     setError(null);
     setReport(null);
     try {
-      const result = unwrap(await supabase.rpc('patrol_report', { p_from: from, p_to: to, p_contractor_id: contractorId || null })) as PatrolReport;
+      const result = unwrap(await supabase.rpc('patrol_report', { p_from: from, p_to: to, p_contractor_id: null })) as PatrolReport;
       setReport(result);
       setPage(0);
     } catch (e) {
@@ -75,17 +73,11 @@ export default function ReportsPage() {
         <div className="flex flex-wrap items-end gap-3">
           <Field label="From date"><Input type="date" disabled={busy} value={from} onChange={(e) => { setFrom(e.target.value); setReport(null); }} /></Field>
           <Field label="To date"><Input type="date" disabled={busy} value={to} min={from} onChange={(e) => { setTo(e.target.value); setReport(null); }} /></Field>
-          <Field label="Contractor">
-            <Select disabled={busy} value={contractorId} onChange={(e) => { setContractorId(e.target.value); setReport(null); }}>
-              <option value="">All contractors</option>
-              {contractors.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </Field>
           <Button icon={Play} loading={busy} onClick={() => void run()}>Generate report</Button>
           <Button variant="secondary" icon={FileDown} disabled={!report || exporting} onClick={() => void download('pdf')}>PDF</Button>
           <Button variant="outline" icon={FileDown} disabled={!report || exporting} onClick={() => void download('csv')}>Excel / CSV</Button>
         </div>
-        <ErrorNote message={error ?? contractors.error} />
+        <ErrorNote message={error} />
       </Card>
       {report && totals ? (
         <>
@@ -97,7 +89,7 @@ export default function ReportsPage() {
             <StatCard icon={FileDown} label="Missing attachments" value={totals.missingAttachments} hint="Evidence still awaiting upload or recovery" />
           </div>
           <Card title="Nights" className="mb-[14px]">
-            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} nights need a supervisor's explanation: no patrol recorded, missed, or not every location verified.` : 'No nights need an explanation.'}{report.contractor_name ? ` Showing ${report.contractor_name} only.` : ''}</p>
+            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} nights need a supervisor's explanation: no patrol recorded, missed, or not every location verified.` : 'No nights need an explanation.'}</p>
             <Table head={['Night of', 'Result', 'Verified / required', 'Guard on duty']}>
               {nights.map((n) => (
                 <tr key={n.date}>

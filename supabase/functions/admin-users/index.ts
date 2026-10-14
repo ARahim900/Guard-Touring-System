@@ -16,7 +16,9 @@
 // caller's login is checked in step 1 below instead.
 //
 // Actions (POST JSON body):
-//   { action: 'create', email, password, full_name, role?, contractor_id?, employee_no?, phone? }
+//   { action: 'create', email, password, full_name, role?, employee_no?, phone? }
+//   (contractor_id? is still accepted from older portal builds but no longer
+//   sent: Muscat Bay's security team are its own staff.)
 //   { action: 'set_password', user_id, password }
 //   { action: 'set_active', user_id, active }
 //
@@ -109,7 +111,7 @@ Deno.serve(async (req) => {
         .update({
           full_name: fullName,
           role,
-          contractor_id: body.contractor_id || null,
+          contractor_id: body.contractor_id || null, // legacy, optional
           employee_no: body.employee_no ? String(body.employee_no).trim() : null,
           phone: body.phone ? String(body.phone).trim() : null,
         })

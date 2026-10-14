@@ -8,6 +8,7 @@ import { RefreshControl, StyleSheet, View } from 'react-native';
 import { ShiftControls } from '@/components/ShiftControls';
 import { SosButton } from '@/components/SosButton';
 import { SyncBanner } from '@/components/SyncBanner';
+import { UpdateNotice } from '@/components/UpdateNotice';
 import { AppText, Badge, Button, Card, EmptyState, LoadingView, ProgressBar, Screen, SectionTitle } from '@/components/ui';
 import { useAuth } from '@/context/AuthProvider';
 import { useShift, type CheckpointView } from '@/context/ShiftProvider';
@@ -57,6 +58,7 @@ export default function WorkScreen() {
 
       <Button title="Account and settings" variant="ghost" onPress={() => router.navigate('/personal')} />
       <SyncBanner />
+      <UpdateNotice />
       {fromCache && updatedAt ? (
         <AppText variant="caption">Showing saved data from {formatDateTime(updatedAt)}. Pull down to refresh.</AppText>
       ) : null}

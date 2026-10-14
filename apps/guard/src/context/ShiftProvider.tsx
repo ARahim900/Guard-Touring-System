@@ -31,6 +31,8 @@ interface ShiftContextValue {
   checkpoints: CheckpointView[];
   /** Names the supervisor listed under Night patrol; the guard picks one. */
   guardNames: string[];
+  /** Newest Android APK, as set by an administrator (see UpdateNotice). */
+  appRelease: AppRelease;
   loading: boolean;
   refreshing: boolean;
   error: string | null;
@@ -47,20 +49,54 @@ interface ShiftContextValue {
 
 const ShiftContext = createContext<ShiftContextValue | null>(null);
 
+export interface AppRelease {
+  androidLatestVersion: string | null;
+  androidDownloadUrl: string | null;
+}
+const NO_RELEASE: AppRelease = { androidLatestVersion: null, androidDownloadUrl: null };
+
 interface Snapshot {
   shift: Shift | null;
   checkpoints: ShiftCheckpoint[];
   guardNames: string[];
+  appRelease: AppRelease;
+}
+const EMPTY_SNAPSHOT: Snapshot = { shift: null, checkpoints: [], guardNames: [], appRelease: NO_RELEASE };
+
+interface SettingsRow {
+  guard_names: string[] | null;
+  android_latest_version?: string | null;
+  android_download_url?: string | null;
+}
+
+/** The app_settings values the guard app uses, in one request. */
+async function fetchSettings(): Promise<SettingsRow> {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('guard_names, android_latest_version, android_download_url')
+    .eq('id', 1)
+    .single<SettingsRow>();
+  // 42703 = column does not exist: the release-notice migration is not on this
+  // server yet. Carry on without the notice rather than failing the whole load.
+  if (error?.code === '42703') {
+    const fallback = await supabase.from('app_settings').select('guard_names').eq('id', 1).single<SettingsRow>();
+    if (fallback.error) throw fallback.error;
+    return fallback.data;
+  }
+  if (error) throw error;
+  return data;
 }
 
 async function fetchSnapshot(guardId: string): Promise<Snapshot> {
   // Closes an expired patrol and prepares tonight's, as the web guard page does.
   const { error: prepError } = await supabase.rpc('prepare_my_patrol');
   if (prepError) throw prepError;
-  const { data: settings, error: settingsError } = await supabase
-    .from('app_settings').select('guard_names').eq('id', 1).single<{ guard_names: string[] }>();
-  if (settingsError) throw settingsError;
+  const settings = await fetchSettings();
   const guardNames = settings.guard_names ?? [];
+  const appRelease: AppRelease = {
+    androidLatestVersion: settings.android_latest_version ?? null,
+    androidDownloadUrl: settings.android_download_url ?? null,
+  };
 
   const { data: shifts, error } = await supabase
     .from('shifts')
@@ -72,7 +108,7 @@ async function fetchSnapshot(guardId: string): Promise<Snapshot> {
   if (error) throw error;
 
   const shift = shifts?.[0] ?? null;
-  if (!shift) return { shift: null, checkpoints: [], guardNames };
+  if (!shift) return { shift: null, checkpoints: [], guardNames, appRelease };
 
   const { data: cps, error: cpError } = await supabase
     .from('shift_checkpoint_status')
@@ -80,14 +116,14 @@ async function fetchSnapshot(guardId: string): Promise<Snapshot> {
     .eq('shift_id', shift.id)
     .order('sequence', { ascending: true });
   if (cpError) throw cpError;
-  return { shift, checkpoints: (cps ?? []) as ShiftCheckpoint[], guardNames };
+  return { shift, checkpoints: (cps ?? []) as ShiftCheckpoint[], guardNames, appRelease };
 }
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const guardId = session?.user.id ?? null;
 
-  const [snapshot, setSnapshot] = useState<Snapshot>({ shift: null, checkpoints: [], guardNames: [] });
+  const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY_SNAPSHOT);
   const [local, setLocal] = useState<Map<string, unknown>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -116,7 +152,12 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       const cached = await readCache<Snapshot>(`shift.${guardId}`);
       if (cached) {
-        setSnapshot({ ...cached.value, guardNames: cached.value.guardNames ?? [] }); // saved by an older app version
+        // Fallbacks: the copy may have been saved by an older app version.
+        setSnapshot({
+          ...cached.value,
+          guardNames: cached.value.guardNames ?? [],
+          appRelease: cached.value.appRelease ?? NO_RELEASE,
+        });
         setUpdatedAt(cached.savedAt);
         setFromCache(true);
         await refreshLocal(cached.value.shift?.id);
@@ -138,7 +179,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   // Initial load + reload whenever the app returns to the foreground.
   useEffect(() => {
     // A different user signed in: never show the previous user's shift.
-    setSnapshot({ shift: null, checkpoints: [], guardNames: [] });
+    setSnapshot(EMPTY_SNAPSHOT);
     setLocal(new Map());
     if (!guardId) return;
     setLoading(true);
@@ -234,6 +275,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       shift: snapshot.shift,
       checkpoints,
       guardNames: snapshot.guardNames,
+      appRelease: snapshot.appRelease,
       loading,
       refreshing,
       error,
@@ -244,7 +286,7 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
       startShift,
       endShift,
     }),
-    [snapshot.shift, snapshot.guardNames, checkpoints, loading, refreshing, error, fromCache, updatedAt, refresh, reloadLocal, startShift, endShift],
+    [snapshot.shift, snapshot.guardNames, snapshot.appRelease, checkpoints, loading, refreshing, error, fromCache, updatedAt, refresh, reloadLocal, startShift, endShift],
   );
 
   return <ShiftContext.Provider value={value}>{children}</ShiftContext.Provider>;

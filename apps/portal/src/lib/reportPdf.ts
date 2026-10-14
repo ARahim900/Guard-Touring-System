@@ -18,7 +18,7 @@ export function buildReportPdf(report: PatrolReport): jsPDF {
   doc.setFontSize(16);
   doc.text('Muscat Bay | Night patrol report', 14, 12);
   doc.setFontSize(10);
-  doc.text(`${report.from_date} to ${report.to_date} | ${report.contractor_name ?? 'All contractors'} | Muscat time (UTC+4)`, 14, 20);
+  doc.text(`${report.from_date} to ${report.to_date} | Muscat time (UTC+4)`, 14, 20);
   doc.setTextColor(...PRIMARY);
   doc.setFontSize(10);
   doc.text(`Required: ${totals.required}   Verified: ${totals.verified}   Awaiting review: ${totals.review}   Rejected: ${totals.rejected}   Unvisited: ${totals.unvisited}`, 14, 34);

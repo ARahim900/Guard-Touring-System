@@ -50,7 +50,7 @@ Patrolling_Tour_System/
         ├── netlify.toml          ← build + security headers
         └── src/
             ├── pages/            ← Dashboard, Live map, Alarms, Incidents, Scans,
-            │                       Schedules, Routes, Checkpoints, Guards, Contractors, Reports
+            │                       Schedules, Routes, Checkpoints, Guards, Reports
             ├── components/       ← layout, maps, scan evidence viewer, UI kit
             ├── context/          ← login, live alarms (Realtime)
             └── lib/              ← Supabase client, PDF report, helpers
@@ -70,7 +70,7 @@ Every push and pull request runs the automated checks in `.github/workflows/ci.y
   - RLS isolation: one guard cannot see another guard's data.
   - A guard cannot promote themselves to admin.
   - Scan validation: distance, mocked GPS, wrong tag, clock drift and idempotent retries.
-  - Gallery photo dating, storage folder rules, statistics, the contractor report, the 5-minute monitor and route-change protection.
+  - Gallery photo dating, storage folder rules, statistics, the monthly patrol report, the 5-minute monitor and route-change protection.
 - The guard app type-checks with zero errors. Its JavaScript bundle builds for Android and iOS.
 - The portal type-checks, builds for production, and its login and privacy pages render with no browser errors.
 - Three independent review agents then audited the database, the guard app and the portal. They confirmed 26 defects, all fixed and re-tested: 7 in the database, 10 in the guard app and 9 in the portal.

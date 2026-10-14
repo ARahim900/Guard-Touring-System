@@ -92,7 +92,6 @@ export default function PersonalScreen() {
       <Card>
         <Info label="Email" value={profile?.email} />
         <Info label="Employee no." value={profile?.employee_no} />
-        <Info label="Contractor" value={profile?.contractors?.name} />
         <TextField
           label="Account name"
           value={fullName}
