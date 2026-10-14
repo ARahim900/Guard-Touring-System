@@ -34,6 +34,7 @@ export function ScanConfirm({ state, done, total, canScan, busy, onClose, onScan
   onClose: () => void; onScan: () => void; onRetryUpload: () => void;
 }) {
   const primary = useRef<HTMLButtonElement>(null);
+  const sheet = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
   const [held, setHeld] = useState(false);
@@ -56,7 +57,7 @@ export function ScanConfirm({ state, done, total, canScan, busy, onClose, onScan
   }, [view.tone]);
 
   useEffect(() => {
-    if (view.tone === 'checking') return;
+    if (view.tone === 'checking') { sheet.current?.focus(); return; }
     primary.current?.focus();
     // A short buzz for a verified visit, a double buzz for anything else (Android; iPhone ignores it).
     try { navigator.vibrate?.(view.tone === 'success' ? 120 : [90, 70, 90]); } catch { /* not supported */ }
@@ -65,7 +66,8 @@ export function ScanConfirm({ state, done, total, canScan, busy, onClose, onScan
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4">
       <div onPointerDown={() => setHeld(true)} onKeyDown={() => setHeld(true)} role={view.tone === 'danger' || view.tone === 'warning' ? 'alertdialog' : 'dialog'} aria-modal="true" aria-labelledby="scan-confirm-title" aria-describedby="scan-confirm-message"
-        className="mb-pop w-full max-w-md rounded-t-3xl bg-card px-6 pt-8 pb-[calc(24px+env(safe-area-inset-bottom))] text-center shadow-card sm:rounded-3xl sm:pb-6">
+        ref={sheet} tabIndex={-1}
+        className="mb-pop max-h-[100dvh] w-full max-w-md overflow-y-auto rounded-t-3xl outline-none bg-card px-6 pt-8 pb-[calc(24px+env(safe-area-inset-bottom))] text-center shadow-card sm:rounded-3xl sm:pb-6">
         <div className={`mx-auto flex size-24 items-center justify-center rounded-full ${STYLE[view.tone].ring}`}>
           <Icon className={`size-14 ${STYLE[view.tone].icon} ${view.tone === 'checking' ? 'animate-spin' : ''}`} aria-hidden="true" />
         </div>
@@ -87,7 +89,7 @@ export function ScanConfirm({ state, done, total, canScan, busy, onClose, onScan
               </button>
             ) : null}
             <button ref={view.tone === 'pending' || (canScan && done < total) ? undefined : primary} type="button" onClick={onClose} className="h-12 rounded-xl border border-border text-base font-medium text-primary">
-              {done >= total && total > 0 ? 'Finish' : 'Close'}
+              {done >= total && total > 0 ? 'Back to patrol' : 'Close'}
             </button>
           </div>
         )}
@@ -103,6 +105,6 @@ function describe(state: ConfirmState): { tone: Tone; key: string; title: string
   const feedback = scanFeedback(receipt);
   const meta = `Scanned ${formatTime(receipt.deviceTime)}${receipt.serverTime ? ` · confirmed ${formatTime(receipt.serverTime)}` : ''} · Muscat time`;
   if (feedback.tone === 'success') return { tone: 'success', key: `${receipt.id}-ok`, title: 'Visit verified', message: 'This location is done for tonight.', name: receipt.checkpointName, meta };
-  if (feedback.tone === 'pending') return { tone: 'pending', key: `${receipt.id}-pending`, title: 'Saved on this phone', message: receipt.error ? `Not verified yet. ${receipt.error}` : 'Not verified yet: there is no connection. It uploads by itself; keep the app open.', name: receipt.checkpointName, meta };
+  if (feedback.tone === 'pending') return { tone: 'pending', key: `${receipt.id}-pending`, title: 'Saved on this phone', message: receipt.error ? `Not verified yet. ${receipt.error}` : 'Not verified yet. It uploads by itself as soon as the phone is connected; keep the app open.', name: receipt.checkpointName, meta };
   return { tone: feedback.tone, key: `${receipt.id}-${feedback.tone}`, title: feedback.tone === 'danger' ? 'Not counted' : 'Recorded – needs review', message: feedback.message, name: receipt.checkpointName, meta };
 }

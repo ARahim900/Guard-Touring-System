@@ -7,7 +7,7 @@
 // pop-up that says plainly whether the visit counted.
 // =============================================================================
 import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, LogOut, Navigation, RefreshCw, ScanLine, XCircle } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
 import { InstallPatrol } from '@/components/InstallPatrol';
@@ -32,7 +32,7 @@ function statusOf(checkpoint: PatrolCheckpoint, uploading: boolean): Status {
   return 'todo';
 }
 
-function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
+function GuardTour({ userId, fullName, footer }: { userId: string; fullName: string; footer: ReactNode }) {
   const { signOut } = useAuth();
   const { snapshot, receipts, loading, syncing, cached, error, refresh } = useGuardPatrol(userId);
   const [scanning, setScanning] = useState(false);
@@ -60,6 +60,16 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
   // The pop-up follows the saved receipt, so it turns green the moment the upload is confirmed.
   const shown: ConfirmState | null = confirm?.kind === 'receipt'
     ? { kind: 'receipt', receipt: receipts.find((item) => item.id === confirm.receipt.id) ?? confirm.receipt } : confirm;
+
+  // While the camera or a pop-up is open, the page behind it cannot be reached; afterwards focus returns to Scan.
+  const overlay = scanning || shown !== null;
+  const scanButton = useRef<HTMLButtonElement>(null);
+  const wasOverlay = useRef(false);
+  useEffect(() => {
+    if (wasOverlay.current && !overlay) scanButton.current?.focus();
+    wasOverlay.current = overlay;
+  }, [overlay]);
+  const thisShift = receipts.filter((receipt) => !shift || receipt.shiftId === shift.id);
 
   function openScanner() {
     setActionError(null); setConfirm(null); setScanning(true);
@@ -111,7 +121,7 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
   if (loading) return <Spinner label="Loading your patrol…" />;
   return (
     <>
-      <header className="sticky top-0 z-30 bg-primary px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-4 text-white shadow-card">
+      <header inert={overlay} className="sticky top-0 z-30 bg-primary px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-4 text-white shadow-card">
         <div className="mx-auto max-w-xl">
           <div className="flex items-center gap-3">
             <img src="/apple-touch-icon.png" alt="" className="size-10 rounded-lg" />
@@ -119,7 +129,7 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
               <h1 className="truncate text-lg text-white">{active ? 'Night patrol' : 'MB Patrol'}</h1>
               <p className="truncate text-sm text-white/80">{active ? `${shift.on_duty_name ?? fullName} · ends by itself ${formatTime(shift.scheduled_end)}` : fullName}</p>
             </div>
-            <button type="button" onClick={() => void leave()} disabled={scanning || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>
+            <button type="button" onClick={() => void leave()} disabled={overlay || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>
           </div>
           {active && checkpoints.length ? (
             <div className="mt-4">
@@ -135,9 +145,9 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-xl space-y-5 px-4 pt-4 pb-6">
+      <main inert={overlay} className={`mx-auto max-w-xl space-y-5 px-4 pt-4 ${active ? 'pb-36' : 'pb-10'}`}>
         <ErrorNote message={actionError ?? error} />
-        {cached ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">No connection. Showing the last saved patrol.</p> : null}
+        {cached ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">Showing the patrol saved on this phone. It could not be updated just now.</p> : null}
         {pending.length ? (
           <div role="status" className="flex items-center gap-3 rounded-xl border border-warning bg-warning-bg px-4 py-3 text-warning-text">
             <CloudUpload className="size-5 shrink-0" aria-hidden="true" />
@@ -147,11 +157,19 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
         ) : null}
 
         {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(true); }} /> : null}
-        {active && !inWindow ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">This patrol has ended. Pull down or reopen the app to load the next one.</p> : null}
-        {active && checkpoints.length > 0 && !toVisit.length ? (
+        {active && !inWindow ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">This patrol has ended. Tap Refresh to load the next one.</p> : null}
+        {(error || cached || (active && !inWindow)) && !pending.length ? (
+          <button type="button" onClick={() => void refresh(true)} disabled={syncing} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-medium text-primary disabled:opacity-50"><RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />Refresh</button>
+        ) : null}
+        {active && checkpoints.length > 0 && verified === checkpoints.length ? (
           <div role="status" className="flex items-center gap-3 rounded-2xl bg-success-bg px-5 py-4 text-success-text">
             <CheckCircle2 className="size-7 shrink-0" aria-hidden="true" />
-            <p className="font-semibold">Every location is visited. Nothing else to do; the patrol ends by itself.</p>
+            <p className="font-semibold">All {checkpoints.length} locations verified. Nothing else to do; the patrol ends by itself.</p>
+          </div>
+        ) : active && checkpoints.length > 0 && !toVisit.length ? (
+          <div role="status" className="flex items-center gap-3 rounded-2xl bg-warning-bg px-5 py-4 text-warning-text">
+            <AlertTriangle className="size-7 shrink-0" aria-hidden="true" />
+            <p className="font-semibold">Every location is scanned, but {[uploading ? `${uploading} still waiting to upload` : '', review ? `${review} awaiting supervisor review` : ''].filter(Boolean).join(' and ')}. Keep the app open.</p>
           </div>
         ) : null}
 
@@ -159,21 +177,22 @@ function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
         {toVisit.length ? <LocationGroup title={active ? 'To visit' : 'Tonight’s locations'} rows={toVisit} active={active} /> : null}
         {visited.length ? <LocationGroup title="Visited" rows={visited} active={active} /> : null}
 
-        {receipts.length ? (
+        {thisShift.length ? (
           <details className="rounded-xl border border-border bg-card px-4 py-3">
-            <summary className="flex min-h-11 cursor-pointer items-center justify-between text-sm font-semibold text-primary">Scan history on this phone<ChevronRight className="size-4" aria-hidden="true" /></summary>
-            <ul className="divide-y divide-border">{receipts.slice(0, 20).map((receipt) => {
+            <summary className="flex min-h-11 cursor-pointer items-center justify-between text-sm font-semibold text-primary">Scan history on this phone ({thisShift.length})<ChevronRight className="size-4" aria-hidden="true" /></summary>
+            <ul className="divide-y divide-border">{thisShift.map((receipt) => {
               const feedback = scanFeedback(receipt);
-              return <li key={receipt.id} className="py-3 text-sm"><div className="flex justify-between gap-3"><p className="font-medium">{receipt.checkpointName}</p><p className="tabular-nums">{formatTime(receipt.deviceTime)}</p></div><p className={feedback.tone === 'danger' ? 'font-semibold text-danger-text' : feedback.tone === 'success' ? 'text-success-text' : 'text-warning-text'}>{feedback.title}</p><p className="text-muted-foreground">{formatDateTime(receipt.deviceTime)}</p></li>;
+              return <li key={receipt.id} className="py-3 text-sm"><div className="flex justify-between gap-3"><p className="font-medium">{receipt.checkpointName}</p><p className="tabular-nums">{formatTime(receipt.deviceTime)}</p></div><p className={feedback.tone === 'danger' ? 'font-semibold text-danger-text' : feedback.tone === 'success' ? 'text-success-text' : 'text-warning-text'}>{feedback.title}</p>{feedback.tone !== 'success' ? <p>{feedback.message}</p> : null}<p className="text-muted-foreground">{formatDateTime(receipt.deviceTime)}</p></li>;
             })}</ul>
           </details>
         ) : null}
+        {footer}
       </main>
 
       {active ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] backdrop-blur">
+        <div inert={overlay} className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
           <div className="mx-auto max-w-xl">
-            <button type="button" onClick={openScanner} disabled={!canScan || scanning || shown?.kind === 'checking'} className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-lg font-semibold text-white shadow-card active:bg-primary-hover disabled:opacity-50">
+            <button ref={scanButton} type="button" onClick={openScanner} disabled={!canScan || scanning || shown?.kind === 'checking'} className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-lg font-semibold text-white shadow-card active:bg-primary-hover disabled:opacity-50">
               <ScanLine className="size-6" aria-hidden="true" />Scan location
             </button>
           </div>
@@ -212,7 +231,7 @@ function LocationGroup({ title, rows, active }: { title: string; rows: { checkpo
           <li key={checkpoint.checkpoint_id} className={`flex items-center gap-3 px-4 py-3 ${status === 'verified' ? 'bg-success-bg/40' : ''}`}>
             <StatusIcon status={status} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-medium">{checkpoint.checkpoint_name}</p>
+              <p className="text-base font-medium break-words">{checkpoint.checkpoint_name}</p>
               <p className={`text-sm ${ROW[status].text}`}>{ROW[status].label(checkpoint, active)}</p>
             </div>
             {status === 'todo' || status === 'rejected' ? (
@@ -232,11 +251,12 @@ export default function GuardPatrolPage() {
   if (profile.role !== 'guard') return <Navigate to="/" replace />;
   return (
     <div className="min-h-full bg-background">
-      <GuardTour key={profile.id} userId={profile.id} fullName={profile.full_name} />
-      <footer className="mx-auto max-w-xl space-y-4 px-4 pb-40">
-        <InstallPatrol />
-        <p className="text-sm text-muted-foreground">Allow camera and precise location when scanning. GPS is recorded only with each scan, never in the background. <Link className="underline" to="/privacy">Privacy</Link></p>
-      </footer>
+      <GuardTour key={profile.id} userId={profile.id} fullName={profile.full_name} footer={
+        <footer className="space-y-4 pt-4">
+          <InstallPatrol />
+          <p className="text-sm text-muted-foreground">Allow camera and precise location when scanning. GPS is recorded only with each scan, never in the background. <Link className="underline" to="/privacy">Privacy</Link></p>
+        </footer>
+      } />
     </div>
   );
 }

@@ -14,6 +14,14 @@ export function PatrolScanner({ onScan, onClose, fullscreen = false }: {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   onScanRef.current = onScan;
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (fullscreen) closeButton.current?.focus(); }, [fullscreen]);
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen, onClose]);
 
   useEffect(() => {
     let disposed = false;
@@ -56,7 +64,7 @@ export function PatrolScanner({ onScan, onClose, fullscreen = false }: {
     <section role="dialog" aria-modal="true" aria-label="Camera scanner" className="fixed inset-0 z-50 flex flex-col bg-black text-white">
       <header className="flex items-center justify-between gap-3 px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-3">
         <h2 className="text-lg text-white">Scan the location's QR label</h2>
-        <button type="button" onClick={onClose} aria-label="Close camera" className="flex size-12 items-center justify-center rounded-full bg-white/15"><X className="size-6" aria-hidden="true" /></button>
+        <button ref={closeButton} type="button" onClick={onClose} aria-label="Close camera" className="flex size-12 items-center justify-center rounded-full bg-white/15"><X className="size-6" aria-hidden="true" /></button>
       </header>
       <div className="relative min-h-0 flex-1">
         <video ref={video} autoPlay muted playsInline className={`absolute inset-0 size-full object-cover ${error ? 'hidden' : ''}`} aria-label="Live camera preview" />
