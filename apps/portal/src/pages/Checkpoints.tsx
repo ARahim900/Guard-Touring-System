@@ -39,7 +39,7 @@ export default function CheckpointsPage() {
   const previewCheckpoints = useMemo(() => qrPreview?.id ? (data ?? []).filter((checkpoint) => checkpoint.id === qrPreview.id) : printable, [data, qrPreview, printable]);
   const unplaced = (data ?? []).filter((checkpoint) => !checkpoint.placed_at).length;
 
-  const points = useMemo(() => (data ?? []).filter((c) => c.placed_at).map((c) => [c.latitude, c.longitude] as [number, number]), [data]);
+  const points = useMemo(() => (data ?? []).filter((c) => c.placed_at && c.active).map((c) => [c.latitude, c.longitude] as [number, number]), [data]);
 
   function edit(c: Checkpoint) {
     setForm({ ...c, latitude: String(c.latitude), longitude: String(c.longitude), radius_m: String(c.radius_m) });

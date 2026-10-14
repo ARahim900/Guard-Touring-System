@@ -103,7 +103,8 @@ export default function WorkScreen() {
             </Card>
           ) : (
             <Card style={{ padding: 0, gap: 0 }}>
-              {checkpoints.map((cp, i) => {
+              {/* Still to visit first; verified locations drop to the bottom. */}
+              {[...checkpoints].sort((a, b) => Number(a.completed) - Number(b.completed)).map((cp, i) => {
                 const st = checkpointState(cp);
                 return (
                   <View
