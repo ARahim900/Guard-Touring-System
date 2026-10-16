@@ -135,7 +135,7 @@ export default function GuardPatrolPage() {
   if (profile.role !== 'guard') return <Navigate to="/" replace />;
   return (
     <div className="min-h-full bg-background">
-      <header className="bg-primary px-5 py-5 text-white"><div className="mx-auto flex max-w-xl items-center gap-3"><img src="/apple-touch-icon.png" alt="Muscat Bay" className="size-11 rounded-md" /><div><p className="font-semibold">MB Patrol</p><h1 className="text-lg text-white">Guard scanning</h1></div></div></header>
+      <header className="bg-primary px-5 py-5 text-white"><div className="mx-auto flex max-w-xl items-center gap-3"><img src="/apple-touch-icon.png" alt="Muscat Bay" className="size-11 rounded-md" /><div><p className="font-semibold">MB Security</p><h1 className="text-lg text-white">Guard scanning</h1></div></div></header>
       <main className="mx-auto max-w-xl space-y-6 px-4 py-6 pb-12">
         <GuardTour key={profile.id} userId={profile.id} fullName={profile.full_name} />
         <InstallPatrol />

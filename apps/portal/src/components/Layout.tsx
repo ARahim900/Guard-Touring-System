@@ -199,11 +199,11 @@ export function Layout() {
       <div className="sticky top-0 z-40">
         <header className="bg-primary px-4 py-2.5 text-white sm:px-6">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-            <NavLink to="/" className="flex min-h-11 shrink-0 items-center gap-3 rounded-sm" aria-label="MB Patrol home">
+            <NavLink to="/" className="flex min-h-11 shrink-0 items-center gap-3 rounded-sm" aria-label="MB Security home">
               <BrandMark className="size-9" />
               <span className="leading-tight">
-                <span className="hidden text-sm tracking-[0.14em] text-secondary uppercase sm:block">Muscat Bay Security</span>
-                <span className="block font-serif text-lg font-semibold">MB Patrol</span>
+                <span className="hidden text-sm tracking-[0.14em] text-secondary uppercase sm:block">Muscat Bay</span>
+                <span className="block font-serif text-lg font-semibold">MB Security</span>
               </span>
             </NavLink>
             <AccountMenu />

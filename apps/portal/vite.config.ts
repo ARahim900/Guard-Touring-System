@@ -10,7 +10,7 @@ export default defineConfig({
     registerType: 'prompt',
     injectRegister: 'script-defer',
     manifest: {
-      id: '/', name: 'Muscat Bay Patrol', short_name: 'MB Patrol',
+      id: '/', name: 'Muscat Bay Security', short_name: 'MB Security',
       description: 'Guard checkpoint scanning and patrol monitoring',
       start_url: '/guard', scope: '/', display: 'standalone',
       theme_color: '#4E4456', background_color: '#F7F8F9',
