@@ -2,7 +2,7 @@ import SafariServices
 import UIKit
 import WebKit
 
-/// MB Patrol — iPhone shell around the live supervisor portal.
+/// MB Security — iPhone shell around the live supervisor portal.
 ///
 /// The app IS the website: it loads the Netlify portal full-screen, so every
 /// deploy of `main` reaches the phone with no rebuild. The portal does not paint
@@ -124,7 +124,7 @@ final class PortalViewController: UIViewController {
 
     private func buildOffline() {
         let title = UILabel()
-        title.text = "Cannot reach MB Patrol"
+        title.text = "Cannot reach MB Security"
         title.font = UIFont(name: "Georgia-Bold", size: 22) ?? .boldSystemFont(ofSize: 22)
         title.textColor = Colour.purple
         let body = UILabel()

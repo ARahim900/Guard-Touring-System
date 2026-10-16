@@ -1,4 +1,4 @@
-# MB Patrol: supervisor iPhone app
+# MB Security: supervisor iPhone app
 
 A small native iPhone app (Swift, Apple's WebKit) that shows the live
 supervisor portal (`https://securitymbpatrolling.netlify.app`) full-screen.
@@ -33,6 +33,7 @@ cd apps/portal-ios
 npx eas-cli build -p ios --profile production --auto-submit
 ```
 
+- Home Screen name: **MB Security** (`CFBundleDisplayName` in `ios/MBPatrol/Info.plist`). The App Store Connect record and TestFlight listing are still called "MB Patrol".
 - Expo project: `@arpro900/mb-patrol-portal`. Bundle ID: `com.muscatbay.patrol.supervisor`.
 - App Store Connect app ID `6823613060` is set in `eas.json`.
 - Change `MARKETING_VERSION` in `ios/project.yml` for a new version; EAS raises the build number.

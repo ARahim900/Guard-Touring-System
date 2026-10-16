@@ -1,4 +1,4 @@
-# XcodeGen spec for the MB Patrol iPhone app. Regenerate the Xcode project
+# XcodeGen spec for the MB Security iPhone app. Regenerate the Xcode project
 # after changing this file:  cd apps/portal-ios/ios && xcodegen generate
 name: MBPatrol
 options:
@@ -8,7 +8,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    MARKETING_VERSION: "1.1.0"
+    MARKETING_VERSION: "1.1.1"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: ZQ4KZK5S6J
     SWIFT_VERSION: "5.0"
