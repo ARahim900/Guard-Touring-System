@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en-GB</string>
 	<key>CFBundleDisplayName</key>
-	<string>MB Patrol</string>
+	<string>MB Security</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,9 +25,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>MB Patrol uses the camera to scan checkpoint labels.</string>
+	<string>MB Security uses the camera to scan checkpoint labels.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MB Patrol uses your location to confirm checkpoint scans and to place locations on the map.</string>
+	<string>MB Security uses your location to confirm checkpoint scans and to place locations on the map.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
