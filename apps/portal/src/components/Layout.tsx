@@ -1,6 +1,7 @@
 // =============================================================================
 // Staff page frame: purple top bar with the brand mark and account menu, tabs
-// on wider screens, and a bottom bar on phones (no sideways scrolling).
+// on desktop, and a bottom bar on phones and tablets (no sideways scrolling).
+// The bars sit at z-40, below dialogs (z-50); Leaflet is isolated in index.css.
 // =============================================================================
 import { Bell, ChevronDown, FileText, LogOut, Map as MapIcon, MapPin, Menu, Moon, ScanLine, TriangleAlert, X, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -125,7 +126,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[1200] flex items-end bg-black/40 md:hidden" onPointerDown={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40 lg:hidden" onPointerDown={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -167,7 +168,7 @@ export function Layout() {
 
   return (
     <div className="flex min-h-full flex-col bg-background">
-      <div className="sticky top-0 z-[1100]">
+      <div className="sticky top-0 z-40">
         <header className="bg-primary px-4 py-2.5 text-white sm:px-6">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
             <NavLink to="/" className="flex min-h-11 shrink-0 items-center gap-3 rounded-sm" aria-label="MB Patrol home">
@@ -180,7 +181,7 @@ export function Layout() {
             <AccountMenu />
           </div>
         </header>
-        <nav aria-label="Main navigation" className="hidden border-b border-border bg-card px-3 md:block">
+        <nav aria-label="Main navigation" className="hidden border-b border-border bg-card px-3 lg:block">
           <ul className="mx-auto flex max-w-5xl gap-1">
             {pages.map(({ to, label, icon: Icon }) => (
               <li key={to}>
@@ -199,9 +200,9 @@ export function Layout() {
         </nav>
       </div>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-6 md:pb-6"><Outlet /></main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-6 lg:pb-6"><Outlet /></main>
 
-      <nav aria-label="Main navigation" className="fixed inset-x-0 bottom-0 z-[1100] border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav aria-label="Main navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
         <ul className="grid grid-cols-5">
           {barPages.map(({ to, short, icon: Icon }) => (
             <li key={to}>
