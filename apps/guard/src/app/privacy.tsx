@@ -13,7 +13,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Who we are',
     body: [
-      'MB Patrol is an internal tool operated by Saraya Bandar Jissah SAOC ("Muscat Bay") for security patrols within the Muscat Bay community, Sultanate of Oman. It is used only by Muscat Bay’s own security team and the Muscat Bay staff who supervise it. Every account is created by Muscat Bay.',
+      'MB Security is an internal tool operated by Saraya Bandar Jissah SAOC ("Muscat Bay") for security patrols within the Muscat Bay community, Sultanate of Oman. It is used only by Muscat Bay’s own security team and the Muscat Bay staff who supervise it. Every account is created by Muscat Bay.',
     ],
   },
   {
