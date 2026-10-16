@@ -60,3 +60,17 @@ jobs:
       # and are cleared by an Expo SDK upgrade, not by this repository.
       - run: npm audit --omit=dev --audit-level=high
         continue-on-error: true
+
+  portal-ios:
+    name: Supervisor iPhone app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/portal-ios
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run typecheck
