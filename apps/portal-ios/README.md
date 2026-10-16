@@ -43,5 +43,6 @@ npx eas-cli build -p ios --profile production --auto-submit
 
 ```bash
 cd apps/portal-ios/ios
+pod install
 xcodebuild -workspace MBPatrol.xcworkspace -scheme MBPatrol -configuration Release -sdk iphonesimulator build
 ```
