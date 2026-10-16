@@ -63,14 +63,11 @@ jobs:
 
   portal-ios:
     name: Supervisor iPhone app
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     defaults:
       run:
-        working-directory: apps/portal-ios
+        working-directory: apps/portal-ios/ios
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci
-      - run: npm run typecheck
+      - run: pod install
+      - run: xcodebuild -workspace MBPatrol.xcworkspace -scheme MBPatrol -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
