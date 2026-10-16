@@ -23,6 +23,7 @@ npx eas-cli build -p ios --profile production --auto-submit
 ```
 
 - Expo project: `@arpro900/mb-patrol-portal`. Bundle ID: `com.muscatbay.patrol.supervisor`.
+- App Store Connect app ID `6823613060` is set in `eas.json`, so builds after the first one run without an Apple sign-in.
 - Distribution is private: TestFlight internal testers only, never the public App Store.
 - A TestFlight build expires 90 days after upload.
 
