@@ -1,0 +1,6 @@
+# The app has no CocoaPods dependencies. EAS Build always runs `pod install`,
+# so this minimal Podfile only satisfies that step.
+platform :ios, '17.0'
+
+target 'MBPatrol' do
+end

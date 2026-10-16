@@ -6,7 +6,13 @@
   },
   "build": {
     "production": {
-      "autoIncrement": true
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "scheme": "MBPatrol",
+        "buildConfiguration": "Release",
+        "image": "latest"
+      }
     }
   },
   "submit": {

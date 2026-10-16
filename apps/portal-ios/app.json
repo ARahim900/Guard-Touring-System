@@ -2,35 +2,10 @@
   "expo": {
     "name": "MB Patrol",
     "slug": "mb-patrol-portal",
-    "scheme": "mbpatrolportal",
-    "version": "1.0.0",
-    "orientation": "default",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "bundleIdentifier": "com.muscatbay.patrol.supervisor",
-      "supportsTablet": true,
-      "appleTeamId": "ZQ4KZK5S6J",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "MB Patrol uses the camera to scan checkpoint labels.",
-        "NSLocationWhenInUseUsageDescription": "MB Patrol uses your location to confirm checkpoint scans and to place locations on the map."
-      }
-    },
-    "plugins": [
-      "./plugins/with-scene-lifecycle",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/splash-icon.png",
-          "imageWidth": 200,
-          "backgroundColor": "#4E4456"
-        }
-      ],
-      "expo-web-browser",
-      "expo-sharing"
-    ],
     "owner": "arpro900",
+    "ios": {
+      "bundleIdentifier": "com.muscatbay.patrol.supervisor"
+    },
     "extra": {
       "eas": {
         "projectId": "871e2a8c-3c95-4af1-9387-6c845ff9b6cf"
