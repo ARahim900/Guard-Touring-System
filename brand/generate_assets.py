@@ -33,6 +33,12 @@ PURPLE = (110, 105, 127)  # #6E697F
 TEAL = (174, 223, 226)    # #AEDFE2
 WHITE = (255, 255, 255)
 
+# App icons use the brand framework colours: the mark reversed out of Deep
+# Purple, with Sage Teal bars and white stripes (same treatment as the portal
+# navbar). The official logo files keep the colours sampled above.
+BRAND_PURPLE = (78, 68, 86)    # #4E4456
+BRAND_TEAL = (164, 197, 187)   # #A4C5BB
+
 # ---------------------------------------------------------------------------
 # Geometry of the mark, measured from the supplied file (units: source pixels,
 # the mark's square runs from 0.5 to 89.7 on both axes).
@@ -60,7 +66,7 @@ def clip(poly, keep):
     return out
 
 
-def draw_mark(size: int) -> Image.Image:
+def draw_mark(size: int, bars=TEAL, stripes=PURPLE) -> Image.Image:
     """The stripe mark as sharp vector shapes, `size` px square, transparent."""
     ss = 8  # draw 8x larger, then shrink: smooth anti-aliased edges
     big = Image.new("RGBA", (size * ss, size * ss), (0, 0, 0, 0))
@@ -74,13 +80,13 @@ def draw_mark(size: int) -> Image.Image:
         bar = clip(bar, lambda p, x1=x1: x1 - p[0])
         bar = clip(bar, lambda p: TEAL_CUT - (p[0] + p[1]))
         if len(bar) >= 3:
-            d.polygon(to_px(bar), fill=TEAL)
+            d.polygon(to_px(bar), fill=bars)
 
     for s0, s1 in PURPLE_BANDS:
         band = clip(square, lambda p, s0=s0: (p[0] + p[1]) - s0)
         band = clip(band, lambda p, s1=s1: s1 - (p[0] + p[1]))
         if len(band) >= 3:
-            d.polygon(to_px(band), fill=PURPLE)
+            d.polygon(to_px(band), fill=stripes)
 
     return big.resize((size, size), Image.LANCZOS)
 
@@ -134,10 +140,12 @@ def main():
     portal = ROOT / "apps" / "portal" / "public"
 
     # Icons use the mark only: the wordmark is unreadable at icon size.
-    # iOS / store icon: no transparency allowed -> white background.
-    on_canvas(draw_mark(1024), 1024, 0.6, WHITE).convert("RGB").save(guard / "icon.png")
+    reversed_mark = lambda size: draw_mark(size, BRAND_TEAL, WHITE)
+    # iOS / store icon: no transparency allowed -> Deep Purple background.
+    on_canvas(reversed_mark(1024), 1024, 0.6, BRAND_PURPLE).convert("RGB").save(guard / "icon.png")
     # Android adaptive icon foreground: transparent, inside the 66% safe circle.
-    on_canvas(draw_mark(1024), 1024, 0.46).save(guard / "adaptive-icon.png")
+    # Its Deep Purple background is set in app.config.ts (adaptiveIcon.backgroundColor).
+    on_canvas(reversed_mark(1024), 1024, 0.46).save(guard / "adaptive-icon.png")
 
     logo = full_logo(1200, source)
     # Splash screen: full logo, transparent (background colour is set in app.config.ts).
@@ -145,18 +153,21 @@ def main():
     logo.resize((800, round(logo.height * 800 / logo.width)), Image.LANCZOS).save(guard / "logo.png")
 
     # Portal
-    on_canvas(draw_mark(64), 64, 0.84, WHITE).save(portal / "favicon.png")
-    on_canvas(draw_mark(180), 180, 0.66, WHITE).convert("RGB").save(portal / "apple-touch-icon.png")
+    on_canvas(reversed_mark(64), 64, 0.72, BRAND_PURPLE).save(portal / "favicon.png")
+    on_canvas(reversed_mark(180), 180, 0.6, BRAND_PURPLE).convert("RGB").save(portal / "apple-touch-icon.png")
+    # Installed web app (PWA) icon; 0.6 keeps the mark inside the maskable safe zone.
+    on_canvas(reversed_mark(1024), 1024, 0.6, BRAND_PURPLE).convert("RGB").save(portal / "patrol-icon.png")
     logo.resize((800, round(logo.height * 800 / logo.width)), Image.LANCZOS).save(portal / "muscat-bay-logo.png")
     draw_mark(256).save(portal / "muscat-bay-mark.png")
 
     # Preview sheet for a quick visual check (not used by the apps).
-    tiles = [("icon.png", guard / "icon.png"), ("adaptive-icon.png", guard / "adaptive-icon.png"), ("splash-icon.png", guard / "splash-icon.png")]
+    # Each tile is shown on the background the phone will use behind it.
+    tiles = [("icon.png", guard / "icon.png", WHITE), ("adaptive-icon.png", guard / "adaptive-icon.png", BRAND_PURPLE), ("splash-icon.png", guard / "splash-icon.png", WHITE)]
     sheet = Image.new("RGB", (1024 * 3 + 80, 1104), (230, 230, 230))
     d = ImageDraw.Draw(sheet)
-    for i, (name, path) in enumerate(tiles):
+    for i, (name, path, tile_bg) in enumerate(tiles):
         img = Image.open(path).convert("RGBA")
-        bg = Image.new("RGBA", img.size, WHITE + (255,))
+        bg = Image.new("RGBA", img.size, tile_bg + (255,))
         sheet.paste(Image.alpha_composite(bg, img).convert("RGB"), (20 + i * 1044, 60))
         d.text((20 + i * 1044, 20), name, fill=(0, 0, 0))
     sheet.save(ROOT / "brand" / "preview.png")

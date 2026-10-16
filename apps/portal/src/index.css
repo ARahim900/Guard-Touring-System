@@ -7,7 +7,12 @@
 @import "leaflet/dist/leaflet.css";
 
 @theme {
-  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Roboto Slab Variable", Georgia, serif;
+
+  /* Brand minimum on screen is 14px, so the smallest size is 14px. */
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.25rem;
 
   --color-primary: #4e4456;
   --color-primary-hover: #3a3341;
@@ -58,15 +63,22 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-size: 14px;
+    font-variant-numeric: tabular-nums;
   }
   h1,
   h2,
   h3 {
-    @apply font-semibold tracking-tight text-primary;
+    @apply font-serif font-semibold tracking-[-0.01em] text-primary;
   }
   :focus-visible {
-    @apply outline-none ring-2 ring-secondary ring-offset-2;
+    @apply outline-none ring-3 ring-secondary ring-offset-2;
   }
+}
+
+/* Keep Leaflet's internal layers (z-index up to 1000) inside the map, so the
+   sticky top bar, bottom bar, menus and dialogs always sit above it. */
+.leaflet-container {
+  isolation: isolate;
 }
 
 /* Pulsing ring used for SOS markers on the live map. */

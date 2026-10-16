@@ -1,7 +1,8 @@
 // =============================================================================
 // Portal entry point: fonts, styles, crash reporting, routes.
 // =============================================================================
-import '@fontsource-variable/dm-sans';
+import '@fontsource-variable/inter';
+import '@fontsource-variable/roboto-slab';
 import './index.css';
 
 import * as Sentry from '@sentry/react';
