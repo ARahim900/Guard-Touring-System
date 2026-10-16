@@ -4,7 +4,7 @@
 // The bars sit at z-40, below dialogs (z-50); Leaflet is isolated in index.css.
 // =============================================================================
 import { Bell, ChevronDown, FileText, LogOut, Map as MapIcon, MapPin, Menu, Moon, ScanLine, TriangleAlert, X, type LucideIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 
 import { BrandMark } from '@/components/BrandMark';
@@ -112,22 +112,49 @@ function AccountMenu() {
   );
 }
 
-function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+const FOCUSABLE = 'a[href], button:not([disabled])';
+
+function MoreSheet({ open, onClose, returnFocusRef }: { open: boolean; onClose: () => void; returnFocusRef: RefObject<HTMLButtonElement | null> }) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const firstLinkRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
     if (!open) return;
     firstLinkRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      // Keep Tab inside the sheet while it is open (aria-modal).
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    const trigger = returnFocusRef.current;
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      // Give focus back to "More", unless the bar is hidden (wide screen).
+      if (trigger?.isConnected && trigger.offsetParent !== null) trigger.focus();
+    };
+  }, [open, onClose, returnFocusRef]);
 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/40 lg:hidden" onPointerDown={onClose}>
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -164,7 +191,8 @@ export function Layout() {
   const { pathname } = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const closeMore = useCallback(() => setMoreOpen(false), []);
-  const moreActive = morePages.some((page) => pathname.startsWith(page.to));
+  const moreActive = morePages.some((page) => pathname === page.to || pathname.startsWith(`${page.to}/`));
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="flex min-h-full flex-col bg-background">
@@ -226,6 +254,7 @@ export function Layout() {
           ))}
           <li>
             <button
+              ref={moreButtonRef}
               type="button"
               onClick={() => setMoreOpen(true)}
               aria-haspopup="dialog"
@@ -238,7 +267,7 @@ export function Layout() {
           </li>
         </ul>
       </nav>
-      <MoreSheet open={moreOpen} onClose={closeMore} />
+      <MoreSheet open={moreOpen} onClose={closeMore} returnFocusRef={moreButtonRef} />
     </div>
   );
 }
