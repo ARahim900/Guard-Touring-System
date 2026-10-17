@@ -1,131 +1,247 @@
-import { CheckCircle2, MapPin, RefreshCw, ScanLine, XCircle } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+// =============================================================================
+// Guard patrol screen (phone): one job, scan every location once.
+// =============================================================================
+// Layout, top to bottom: a slim header with the patrol's progress, the list of
+// locations split into "To visit" and "Visited", and a Scan button fixed at the
+// bottom of the screen within thumb reach. Every scan ends in a full-screen
+// pop-up that says plainly whether the visit counted.
+// =============================================================================
+import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, LogOut, Navigation, RefreshCw, ScanLine, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
-import { InstallPatrol } from '@/components/InstallPatrol';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
-import { ScanResult } from '@/components/ScanResult';
-import { scanFeedback } from '@/lib/scanFeedback';
+import { InstallPatrol } from '@/components/InstallPatrol';
 import { PatrolScanner } from '@/components/PatrolScanner';
-import { Button, ErrorNote, Spinner } from '@/components/ui';
+import { ScanConfirm, type ConfirmState } from '@/components/ScanConfirm';
+import { ErrorNote, Spinner } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
-import { captureLocation } from '@/lib/guardPatrol';
+import { captureLocation, type PatrolCheckpoint } from '@/lib/guardPatrol';
 import { readReceipts, saveReceipt, type PatrolReceipt } from '@/lib/guardOutbox';
+import { scanFeedback } from '@/lib/scanFeedback';
 import { formatDateTime, formatTime } from '@/lib/time';
 import { useGuardPatrol } from '@/lib/useGuardPatrol';
 
-function GuardTour({ userId, fullName }: { userId: string; fullName: string }) {
+type Status = 'verified' | 'uploading' | 'review' | 'rejected' | 'todo';
+
+function statusOf(checkpoint: PatrolCheckpoint, uploading: boolean): Status {
+  if (checkpoint.completed) return 'verified';
+  if (uploading) return 'uploading';
+  if (checkpoint.validation === 'flagged') return 'review';
+  if (checkpoint.validation === 'rejected') return 'rejected';
+  return 'todo';
+}
+
+function GuardTour({ userId, fullName, footer }: { userId: string; fullName: string; footer: ReactNode }) {
   const { signOut } = useAuth();
   const { snapshot, receipts, loading, syncing, cached, error, refresh } = useGuardPatrol(userId);
   const [scanning, setScanning] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const errorPanel = useRef<HTMLDivElement>(null);
-  const scanInProgress = useRef(false);
-  const [latestAttempt, setLatestAttempt] = useState<PatrolReceipt | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const scanInProgress = useRef(false);
   const shift = snapshot?.shift;
+  const active = shift?.status === 'active';
   const checkpoints = snapshot?.checkpoints ?? [];
   const pending = receipts.filter((receipt) => receipt.state === 'pending');
-  const complete = checkpoints.filter((checkpoint) => checkpoint.completed).length;
-  const inWindow = shift && Date.now() >= Date.parse(shift.scheduled_start) && Date.now() <= Date.parse(shift.scheduled_end);
+  const inWindow = Boolean(shift && Date.now() >= Date.parse(shift.scheduled_start) && Date.now() <= Date.parse(shift.scheduled_end));
+  const canScan = active && inWindow && checkpoints.length > 0;
 
-  const result = latestAttempt ? receipts.find((item) => item.id === latestAttempt.id) ?? latestAttempt
-    : receipts.find((item) => item.shiftId === shift?.id) ?? null;
+  const rows = checkpoints.map((checkpoint) => ({
+    checkpoint,
+    status: statusOf(checkpoint, pending.some((receipt) => receipt.shiftId === shift?.id && receipt.checkpointId === checkpoint.checkpoint_id)),
+  }));
+  const toVisit = rows.filter((row) => row.status === 'todo' || row.status === 'rejected');
+  const visited = rows.filter((row) => row.status !== 'todo' && row.status !== 'rejected')
+    .sort((a, b) => (b.checkpoint.scanned_at ?? '').localeCompare(a.checkpoint.scanned_at ?? ''));
+  const verified = rows.filter((row) => row.status === 'verified').length;
+  const uploading = rows.filter((row) => row.status === 'uploading').length;
+  const review = rows.filter((row) => row.status === 'review').length;
 
+  // The pop-up follows the saved receipt, so it turns green the moment the upload is confirmed.
+  const shown: ConfirmState | null = confirm?.kind === 'receipt'
+    ? { kind: 'receipt', receipt: receipts.find((item) => item.id === confirm.receipt.id) ?? confirm.receipt } : confirm;
+
+  // While the camera or a pop-up is open, the page behind it cannot be reached; afterwards focus returns to Scan.
+  const overlay = scanning || shown !== null;
+  const scanButton = useRef<HTMLButtonElement>(null);
+  const wasOverlay = useRef(false);
   useEffect(() => {
-    if (actionError) { errorPanel.current?.focus({ preventScroll: true }); errorPanel.current?.scrollIntoView({ block: 'nearest' }); }
-  }, [actionError]);
+    if (wasOverlay.current && !overlay) scanButton.current?.focus();
+    wasOverlay.current = overlay;
+  }, [overlay]);
+  const thisShift = receipts.filter((receipt) => !shift || receipt.shiftId === shift.id);
 
   function openScanner() {
-    setActionError(null); setNotice(null); setScanning(true);
+    setActionError(null); setConfirm(null); setScanning(true);
   }
 
   async function record(code: string, method: 'qr' | 'barcode') {
     if (scanInProgress.current) return;
     scanInProgress.current = true;
     setScanning(false);
-    setBusy(true);
-    setActionError(null);
-    setLatestAttempt(null);
-    setNotice('Label read. Capturing your GPS position…');
     const deviceTime = new Date().toISOString();
+    const checkpoint = checkpoints.find((item) => item.code === code.trim());
     try {
-      if (!shift || shift.status !== 'active' || !inWindow) throw new Error('Scanning is only available during your active shift.');
-      const checkpoint = checkpoints.find((item) => item.code === code);
-      if (!checkpoint) throw new Error('This QR code is not one of this shift’s locations.');
-      if (checkpoint.completed) { setNotice(`${checkpoint.checkpoint_name} is already verified for this shift.`); return; }
-      if ((await readReceipts(userId)).some((item) => item.shiftId === shift.id && item.checkpointId === checkpoint.checkpoint_id && item.state === 'pending')) {
-        setNotice('This location already has a pending scan. Tap Retry upload.'); return;
+      if (!shift || !active || !inWindow) throw new Error('Scanning is only available during your patrol.');
+      if (!checkpoint) {
+        setConfirm({ kind: 'notice', tone: 'danger', title: 'Not one of tonight’s locations', message: 'This QR code is not on your patrol. Scan the QR label fixed at the location.' });
+        return;
       }
+      if (checkpoint.completed) {
+        setConfirm({ kind: 'notice', tone: 'info', name: checkpoint.checkpoint_name, title: 'Already verified', message: `Verified at ${formatTime(checkpoint.scanned_at ?? '')}. No need to scan it again tonight.` });
+        return;
+      }
+      if ((await readReceipts(userId)).some((item) => item.shiftId === shift.id && item.checkpointId === checkpoint.checkpoint_id && item.state === 'pending')) {
+        setConfirm({ kind: 'notice', tone: 'info', name: checkpoint.checkpoint_name, title: 'Already saved on this phone', message: 'This visit is waiting to upload. It uploads by itself when there is a connection.' });
+        return;
+      }
+      setConfirm({ kind: 'checking', name: checkpoint.checkpoint_name, message: 'Getting your GPS position…' });
       const position = await captureLocation();
       const receipt: PatrolReceipt = {
         id: crypto.randomUUID(), userId, shiftId: shift.id, checkpointId: checkpoint.checkpoint_id,
-        checkpointName: checkpoint.checkpoint_name, code, method, deviceTime,
+        checkpointName: checkpoint.checkpoint_name, code: code.trim(), method, deviceTime,
         latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, state: 'pending',
       };
       await saveReceipt(receipt);
-      setLatestAttempt(receipt);
-      setNotice(null);
+      setConfirm({ kind: 'checking', name: checkpoint.checkpoint_name, message: 'Verifying the visit…' });
       await refresh(true);
-    } catch (cause) { setNotice(null); setActionError(`Scan not recorded. ${friendlyError(cause)}`); }
-    finally { setBusy(false); scanInProgress.current = false; }
+      setConfirm({ kind: 'receipt', receipt });
+    } catch (cause) {
+      setConfirm({ kind: 'notice', tone: 'danger', name: checkpoint?.checkpoint_name, title: 'Scan not recorded', message: friendlyError(cause) });
+    } finally { scanInProgress.current = false; }
   }
 
   async function leave() {
     try {
-      if ((await readReceipts(userId)).some((receipt) => receipt.state === 'pending')) throw new Error('Upload your pending scans before signing out.');
+      if ((await readReceipts(userId)).some((receipt) => receipt.state === 'pending')) throw new Error('Upload your saved scans before signing out.');
       await signOut();
     } catch (cause) { setActionError(friendlyError(cause)); }
   }
 
   if (loading) return <Spinner label="Loading your patrol…" />;
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-medium">{fullName}</p>
-        <Button variant="ghost" disabled={busy || scanning} onClick={() => void leave()}>Sign out</Button>
-      </div>
-      <div ref={errorPanel} tabIndex={-1}><ErrorNote message={actionError ?? (error === result?.error ? null : error)} /></div>
-      {cached ? <p role="status" className="text-sm">Using the last saved patrol. Reconnect to check for changes.</p> : null}
-      {result && !notice && !scanning && !actionError ? <ScanResult receipt={result} announce={latestAttempt !== null} disabled={busy || syncing || (result.state !== 'pending' && !inWindow)} onRetry={() => result.state === 'pending' ? void refresh(true) : openScanner()} /> : null}
-      {notice ? <p role="status" className="rounded-md bg-secondary-light p-4 text-primary">{notice}</p> : null}
-      {(pending.length || error) && result?.state !== 'pending' ? <Button variant="outline" icon={RefreshCw} loading={syncing} disabled={busy || scanning} onClick={() => void refresh(true)}>{pending.length ? 'Retry upload' : 'Try again'}</Button> : null}
-      {pending.length ? <p className="text-sm">{pending.length} scan(s) are saved on this phone but not confirmed by Supabase. Keep this app open with internet access to upload. Do not clear this site's data.</p> : null}
-      {shift?.status !== 'active' ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(true); }} /> : (
-        <section className="space-y-4 rounded-xl border border-border bg-card p-5">
-          <h2 className="text-xl">Night patrol</h2>
-          <p className="text-sm">{formatDateTime(shift.scheduled_start)} – {formatDateTime(shift.scheduled_end)} · Muscat time</p>
-          <div className="rounded-lg bg-secondary-light p-4"><p className="text-2xl font-semibold text-primary">{complete}<span className="text-base font-normal"> / {checkpoints.length} locations</span></p><p className="mt-1 text-sm text-primary">{complete === checkpoints.length && checkpoints.length > 0 ? 'All locations verified for this shift' : 'Scan each location once to complete your round'}</p></div>
-          <p className="text-sm text-muted-foreground">Scan and upload times are recorded automatically.</p>
-          <p className="text-sm">On duty: {shift.on_duty_name ?? fullName}</p>
-          {!scanning ? <Button className="min-h-14 w-full text-base" icon={ScanLine} loading={busy} disabled={syncing || !inWindow || checkpoints.length === 0} onClick={openScanner}>Scan location</Button> : null}
-          {!inWindow ? <p className="text-sm">This shift has ended. Refresh to start your next patrol.</p> : null}
-        </section>
-      )}
-          {scanning && shift?.status === 'active' ? <PatrolScanner onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
-          <section>
-            <h2 className="mb-3 text-lg">Your locations</h2>
-            {!checkpoints.length ? <p>Your manager needs to add the patrol locations.</p> : null}
-            <ul className="divide-y divide-border">
-              {/* Still to visit first; verified locations drop to the bottom. */}
-              {[...checkpoints].sort((a, b) => Number(a.completed) - Number(b.completed)).map((checkpoint) => {
-                const waiting = pending.some((receipt) => receipt.shiftId === shift?.id && receipt.checkpointId === checkpoint.checkpoint_id);
-                const label = checkpoint.completed ? `Verified · ${formatTime(checkpoint.scanned_at ?? '')}` : waiting ? 'Pending upload'
-                  : checkpoint.validation === 'flagged' ? 'Awaiting supervisor review' : checkpoint.validation === 'rejected' ? 'Rejected — scan again at the location' : shift?.status === 'active' ? 'Not yet visited' : 'Ready to scan when you start';
-                return <li key={checkpoint.checkpoint_id} className="flex items-center gap-3 py-4">
-                  {checkpoint.completed ? <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" /> : checkpoint.validation === 'rejected' ? <XCircle className="size-6 shrink-0 text-danger-text" aria-hidden="true" /> : <MapPin className="size-5 shrink-0 text-primary" aria-hidden="true" />}
-                  <div className="min-w-0 flex-1"><p className="font-medium">{checkpoint.sequence}. {checkpoint.checkpoint_name}</p><p className={`text-sm ${checkpoint.validation === 'rejected' && !checkpoint.completed ? 'font-medium text-danger-text' : 'text-muted-foreground'}`}>{label}</p></div>
-                  <a className="shrink-0 py-3 text-sm text-primary underline" aria-label={`Directions to ${checkpoint.checkpoint_name}`} target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${checkpoint.latitude},${checkpoint.longitude}`}>Directions</a>
-                </li>;
-              })}
-            </ul>
-          </section>
-      {receipts.length ? <section className="border-t border-border pt-4"><h2 className="text-lg">Recent scans</h2><p className="mt-1 text-sm text-muted-foreground">Recorded automatically on this phone · Muscat time</p><ul className="mt-3 divide-y divide-border">{receipts.slice(0, 5).map((receipt) => {
-        const feedback = scanFeedback(receipt);
-        return <li key={receipt.id} className="space-y-2 py-4 text-sm"><div className="flex justify-between gap-3"><p className="font-medium">{receipt.checkpointName}</p><p>{formatTime(receipt.deviceTime)}</p></div><p className={feedback.tone === 'danger' ? 'font-semibold text-danger-text' : 'font-medium'}>{feedback.title}</p>{feedback.tone !== 'success' ? <p>{feedback.message}</p> : null}<p className="text-muted-foreground">{formatDateTime(receipt.deviceTime)}</p></li>;
-      })}</ul></section> : null}
-    </div>
+    <>
+      <header inert={overlay} className="sticky top-0 z-30 bg-primary px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-4 text-white shadow-card">
+        <div className="mx-auto max-w-xl">
+          <div className="flex items-center gap-3">
+            <img src="/apple-touch-icon.png" alt="" className="size-10 rounded-lg" />
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg text-white">{active ? 'Night patrol' : 'MB Security'}</h1>
+              <p className="truncate text-sm text-white/80">{active ? `${shift.on_duty_name ?? fullName} · ends by itself ${formatTime(shift.scheduled_end)}` : fullName}</p>
+            </div>
+            <button type="button" onClick={() => void leave()} disabled={overlay || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>
+          </div>
+          {active && checkpoints.length ? (
+            <div className="mt-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="text-base font-semibold text-white"><span className="text-2xl tabular-nums">{verified}</span> of {checkpoints.length} verified</p>
+                {uploading || review ? <p className="text-sm text-white/80">{[uploading ? `${uploading} uploading` : '', review ? `${review} in review` : ''].filter(Boolean).join(' · ')}</p> : null}
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label="Locations verified" aria-valuemin={0} aria-valuemax={checkpoints.length} aria-valuenow={verified}>
+                <div className="h-full rounded-full bg-secondary transition-[width] duration-500" style={{ width: `${(verified / checkpoints.length) * 100}%` }} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </header>
+
+      <main inert={overlay} className={`mx-auto max-w-xl space-y-5 px-4 pt-4 ${active ? 'pb-36' : 'pb-10'}`}>
+        <ErrorNote message={actionError ?? error} />
+        {cached ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">Showing the patrol saved on this phone. It could not be updated just now.</p> : null}
+        {pending.length ? (
+          <div role="status" className="flex items-center gap-3 rounded-xl border border-warning bg-warning-bg px-4 py-3 text-warning-text">
+            <CloudUpload className="size-5 shrink-0" aria-hidden="true" />
+            <p className="flex-1 text-sm font-medium">{pending.length} scan{pending.length === 1 ? '' : 's'} saved on this phone, waiting to upload. Keep the app open.</p>
+            <button type="button" onClick={() => void refresh(true)} disabled={syncing} className="flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold underline disabled:opacity-50"><RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />Retry</button>
+          </div>
+        ) : null}
+
+        {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(true); }} /> : null}
+        {active && !inWindow ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">This patrol has ended. Tap Refresh to load the next one.</p> : null}
+        {(error || cached || (active && !inWindow)) && !pending.length ? (
+          <button type="button" onClick={() => void refresh(true)} disabled={syncing} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-medium text-primary disabled:opacity-50"><RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />Refresh</button>
+        ) : null}
+        {active && checkpoints.length > 0 && verified === checkpoints.length ? (
+          <div role="status" className="flex items-center gap-3 rounded-2xl bg-success-bg px-5 py-4 text-success-text">
+            <CheckCircle2 className="size-7 shrink-0" aria-hidden="true" />
+            <p className="font-semibold">All {checkpoints.length} locations verified. Nothing else to do; the patrol ends by itself.</p>
+          </div>
+        ) : active && checkpoints.length > 0 && !toVisit.length ? (
+          <div role="status" className="flex items-center gap-3 rounded-2xl bg-warning-bg px-5 py-4 text-warning-text">
+            <AlertTriangle className="size-7 shrink-0" aria-hidden="true" />
+            <p className="font-semibold">Every location is scanned, but {[uploading ? `${uploading} still waiting to upload` : '', review ? `${review} awaiting supervisor review` : ''].filter(Boolean).join(' and ')}. Keep the app open.</p>
+          </div>
+        ) : null}
+
+        {!checkpoints.length ? <p className="rounded-xl bg-muted px-4 py-3">Your manager needs to add the patrol locations.</p> : null}
+        {toVisit.length ? <LocationGroup title={active ? 'To visit' : 'Tonight’s locations'} rows={toVisit} active={active} /> : null}
+        {visited.length ? <LocationGroup title="Visited" rows={visited} active={active} /> : null}
+
+        {thisShift.length ? (
+          <details className="rounded-xl border border-border bg-card px-4 py-3">
+            <summary className="flex min-h-11 cursor-pointer items-center justify-between text-sm font-semibold text-primary">Scan history on this phone ({thisShift.length})<ChevronRight className="size-4" aria-hidden="true" /></summary>
+            <ul className="divide-y divide-border">{thisShift.map((receipt) => {
+              const feedback = scanFeedback(receipt);
+              return <li key={receipt.id} className="py-3 text-sm"><div className="flex justify-between gap-3"><p className="font-medium">{receipt.checkpointName}</p><p className="tabular-nums">{formatTime(receipt.deviceTime)}</p></div><p className={feedback.tone === 'danger' ? 'font-semibold text-danger-text' : feedback.tone === 'success' ? 'text-success-text' : 'text-warning-text'}>{feedback.title}</p>{feedback.tone !== 'success' ? <p>{feedback.message}</p> : null}<p className="text-muted-foreground">{formatDateTime(receipt.deviceTime)}</p></li>;
+            })}</ul>
+          </details>
+        ) : null}
+        {footer}
+      </main>
+
+      {active ? (
+        <div inert={overlay} className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+          <div className="mx-auto max-w-xl">
+            <button ref={scanButton} type="button" onClick={openScanner} disabled={!canScan || scanning || shown?.kind === 'checking'} className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-lg font-semibold text-white shadow-card active:bg-primary-hover disabled:opacity-50">
+              <ScanLine className="size-6" aria-hidden="true" />Scan location
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {scanning && active ? <PatrolScanner fullscreen onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
+      {shown ? <ScanConfirm state={shown} done={verified} total={checkpoints.length} canScan={canScan} busy={syncing}
+        onClose={() => setConfirm(null)} onScan={openScanner} onRetryUpload={() => void refresh(true)} /> : null}
+    </>
+  );
+}
+
+const ROW: Record<Status, { label: (checkpoint: PatrolCheckpoint, active: boolean) => string; text: string }> = {
+  verified: { label: (c) => `Verified · ${formatTime(c.scanned_at ?? '')}`, text: 'text-success-text' },
+  uploading: { label: () => 'Saved on phone · waiting to upload', text: 'font-medium text-warning-text' },
+  review: { label: () => 'Recorded · awaiting supervisor review', text: 'font-medium text-warning-text' },
+  rejected: { label: () => 'Not counted · scan again at the location', text: 'font-semibold text-danger-text' },
+  todo: { label: (_c, active) => active ? 'Not yet visited' : 'Ready when you start', text: 'text-muted-foreground' },
+};
+
+function StatusIcon({ status }: { status: Status }) {
+  if (status === 'verified') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-success-text text-white"><CheckCircle2 className="size-6" aria-hidden="true" /></span>;
+  if (status === 'uploading') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning-text"><CloudUpload className="size-5" aria-hidden="true" /></span>;
+  if (status === 'review') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning-text"><AlertTriangle className="size-5" aria-hidden="true" /></span>;
+  if (status === 'rejected') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger-text"><XCircle className="size-6" aria-hidden="true" /></span>;
+  return <span aria-hidden="true" className="size-10 shrink-0 rounded-full border-2 border-border bg-card" />;
+}
+
+function LocationGroup({ title, rows, active }: { title: string; rows: { checkpoint: PatrolCheckpoint; status: Status }[]; active: boolean }) {
+  return (
+    <section>
+      <h2 className="mb-2 flex items-center justify-between px-1 text-base">{title}<span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold text-muted-foreground tabular-nums">{rows.length}</span></h2>
+      <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+        {rows.map(({ checkpoint, status }) => (
+          <li key={checkpoint.checkpoint_id} className={`flex items-center gap-3 px-4 py-3 ${status === 'verified' ? 'bg-success-bg/40' : ''}`}>
+            <StatusIcon status={status} />
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium break-words">{checkpoint.checkpoint_name}</p>
+              <p className={`text-sm ${ROW[status].text}`}>{ROW[status].label(checkpoint, active)}</p>
+            </div>
+            {status === 'todo' || status === 'rejected' ? (
+              <a className="flex size-11 shrink-0 items-center justify-center rounded-full text-primary hover:bg-muted" aria-label={`Directions to ${checkpoint.checkpoint_name}`} target="_blank" rel="noreferrer"
+                href={`https://www.google.com/maps/dir/?api=1&destination=${checkpoint.latitude},${checkpoint.longitude}`}><Navigation className="size-5" aria-hidden="true" /></a>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -135,12 +251,12 @@ export default function GuardPatrolPage() {
   if (profile.role !== 'guard') return <Navigate to="/" replace />;
   return (
     <div className="min-h-full bg-background">
-      <header className="bg-primary px-5 py-5 text-white"><div className="mx-auto flex max-w-xl items-center gap-3"><img src="/apple-touch-icon.png" alt="Muscat Bay" className="size-11 rounded-md" /><div><p className="font-semibold">MB Security</p><h1 className="text-lg text-white">Guard scanning</h1></div></div></header>
-      <main className="mx-auto max-w-xl space-y-6 px-4 py-6 pb-12">
-        <GuardTour key={profile.id} userId={profile.id} fullName={profile.full_name} />
-        <InstallPatrol />
-        <p className="text-sm text-muted-foreground">Allow camera and precise location access when scanning. GPS is recorded with each scan; this web section does not track guards in the background. <Link className="underline" to="/privacy">Privacy</Link></p>
-      </main>
+      <GuardTour key={profile.id} userId={profile.id} fullName={profile.full_name} footer={
+        <footer className="space-y-4 pt-4">
+          <InstallPatrol />
+          <p className="text-sm text-muted-foreground">Allow camera and precise location when scanning. GPS is recorded only with each scan, never in the background. <Link className="underline" to="/privacy">Privacy</Link></p>
+        </footer>
+      } />
     </div>
   );
 }

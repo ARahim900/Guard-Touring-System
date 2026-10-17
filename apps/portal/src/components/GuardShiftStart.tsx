@@ -24,12 +24,12 @@ export function GuardShiftStart({ names, endTime, disabled, onStarted }: {
     finally { setSaving(false); }
   }
 
-  return <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
+  return <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
     <h2 className="text-xl">Ready for your patrol?</h2>
     <p className="text-sm text-muted-foreground">Choose your name, then scan the QR label at each location.</p>
     <Field label="Guard on duty"><Select className="min-h-12 text-base" value={name} onChange={(event) => setName(event.target.value)} disabled={saving}><option value="">Choose your name</option>{names.map((guard) => <option key={guard} value={guard}>{guard}</option>)}</Select></Field>
-    <div className="flex gap-3 rounded-xl bg-secondary-light p-4 text-primary"><Clock3 className="size-5 shrink-0" aria-hidden="true" /><div><p className="font-medium">Nothing to finish</p><p className="mt-1 text-sm">Your patrol starts now and ends by itself at {defaultEnd}. Every scan records its time and GPS position.</p></div></div>
+    <div className="flex gap-3 rounded-xl bg-secondary-light p-4 text-primary"><Clock3 className="size-5 shrink-0" aria-hidden="true" /><div><p className="font-medium">No need to end the patrol</p><p className="mt-1 text-sm">It starts now and ends by itself at {defaultEnd}. Every scan records its time and GPS position.</p></div></div>
     <ErrorNote message={error} />
-    <Button className="min-h-14 w-full text-base" icon={ScanLine} loading={saving} disabled={disabled || !name} onClick={() => void begin()}>Start scanning</Button>
+    <Button className="min-h-14 w-full rounded-2xl text-lg font-semibold" icon={ScanLine} loading={saving} disabled={disabled || !name} onClick={() => void begin()}>Start scanning</Button>
   </section>;
 }
