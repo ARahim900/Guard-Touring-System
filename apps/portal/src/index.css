@@ -87,8 +87,14 @@
   100% { transform: scale(2.2); opacity: 0; }
 }
 .mb-ring { animation: mb-ring 1.6s ease-out infinite; }
+/* Scan confirmation pop-up rises into view. */
+@keyframes mb-pop {
+  0% { transform: translateY(24px) scale(0.97); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+.mb-pop { animation: mb-pop 180ms ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .mb-ring { animation: none; }
+  .mb-ring, .mb-pop { animation: none; }
 }
 
 /* Leaflet sits under our modals. */
