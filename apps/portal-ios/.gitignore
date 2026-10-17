@@ -1,0 +1,11 @@
+# Xcode / CocoaPods
+ios/Pods/
+ios/build/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+# Signing material never belongs in Git
+*.p8
+*.p12
+*.mobileprovision
+node_modules/

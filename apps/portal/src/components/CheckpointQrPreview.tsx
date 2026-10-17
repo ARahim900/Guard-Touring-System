@@ -28,7 +28,7 @@ export function CheckpointQrPreview({ checkpoints, initialId, onClose }: { check
   async function share() {
     if (!selected) return;
     setActionError(null); setSharing(true);
-    try { await navigator.share({ files: [selected.file], title: `${selected.name} · MB Patrol` }); }
+    try { await navigator.share({ files: [selected.file], title: `${selected.name} · MB Security` }); }
     catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') setActionError('Sharing cancelled. You can still use Save image.');
       else setActionError(friendlyError(cause, 'Sharing is unavailable. Use Save image instead.'));

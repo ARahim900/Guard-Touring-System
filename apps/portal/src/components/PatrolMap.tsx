@@ -26,15 +26,15 @@ export const icons = {
   checkpoint: (label: string, done?: boolean) =>
     L.divIcon({
       className: '',
-      html: `<div style="background:${done ? '#84B59F' : '#A4C5BB'};color:#4E4456;border:2px solid #4E4456;border-radius:6px;padding:1px 6px;font:600 11px 'DM Sans Variable',sans-serif;white-space:nowrap;transform:translate(-50%,-50%);display:inline-block">${escape(label)}</div>`,
+      html: `<div style="background:${done ? '#84B59F' : '#A4C5BB'};color:#4E4456;border:2px solid #4E4456;border-radius:6px;padding:1px 6px;font:600 14px 'Inter Variable',sans-serif;white-space:nowrap;transform:translate(-50%,-50%);display:inline-block">${escape(label)}</div>`,
       iconSize: [0, 0],
     }),
   guard: (name: string, stale: boolean) =>
     L.divIcon({
       className: '',
       html: `<div style="transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center">
-        <div style="background:${stale ? '#94A3B8' : '#4E4456'};color:#fff;border-radius:6px;padding:2px 8px;font:600 12px 'DM Sans Variable',sans-serif;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3)">${escape(name)}</div>
-        <div style="width:12px;height:12px;border-radius:50%;background:${stale ? '#94A3B8' : '#4E4456'};border:3px solid #fff;margin-top:2px;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div></div>`,
+        <div style="background:${stale ? '#6B7280' : '#4E4456'};color:#fff;border-radius:6px;padding:2px 8px;font:600 14px 'Inter Variable',sans-serif;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3)">${escape(name)}</div>
+        <div style="width:12px;height:12px;border-radius:50%;background:${stale ? '#6B7280' : '#4E4456'};border:3px solid #fff;margin-top:2px;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div></div>`,
       iconSize: [0, 0],
     }),
   sos: () =>

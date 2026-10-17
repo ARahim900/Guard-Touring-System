@@ -33,7 +33,7 @@ export default function LoginPage() {
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg bg-card p-6 shadow-card">
         <div className="flex flex-col items-center gap-2 text-center">
           <img src="/muscat-bay-logo.png" alt="Muscat Bay" className="h-24 w-auto" />
-          <h1 className="text-xl">MB Patrol</h1>
+          <h1 className="text-xl">MB Security</h1>
           <p className="text-sm text-muted-foreground">Guard scanning & supervisor portal</p>
         </div>
         <Field label="Email">

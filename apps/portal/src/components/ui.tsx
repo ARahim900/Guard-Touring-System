@@ -36,8 +36,8 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-        size === 'sm' ? 'h-8 px-3 text-[12.25px]' : 'h-10 px-4 text-sm',
+        'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+        size === 'sm' ? 'h-9 px-3 text-sm' : 'h-10 px-4 text-sm',
         BTN[variant],
         className,
       )}
@@ -54,7 +54,7 @@ export function Card({ children, className, title, action }: { children: ReactNo
     <section className={cx('rounded-lg border border-border bg-card shadow-card', className)}>
       {title ? (
         <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
-          <h2 className="text-[15.75px]">{title}</h2>
+          <h2 className="text-base">{title}</h2>
           {action}
         </header>
       ) : null}
@@ -126,7 +126,7 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-[15.75px]">{title}</h2>
+          <h2 className="text-base">{title}</h2>
           <button onClick={onClose} className="rounded-sm p-1 text-muted-foreground hover:bg-muted" aria-label="Close">
             <X className="size-5" />
           </button>

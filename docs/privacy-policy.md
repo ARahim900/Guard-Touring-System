@@ -1,9 +1,9 @@
-# MB Patrol: Privacy policy
+# MB Security: Privacy policy
 
 > Draft for Muscat Bay's review. Complete every item in **[square brackets]** and have it checked by Legal before release. Keep this text identical to `apps/guard/src/app/privacy.tsx` and `apps/portal/src/pages/Privacy.tsx`.
 
 ## Who we are
-MB Patrol is an internal tool operated by Saraya Bandar Jissah SAOC ("Muscat Bay") for security patrols within the Muscat Bay community, Sultanate of Oman. It is used only by Muscat Bay's own security team and the Muscat Bay staff who supervise it. Every account is created by Muscat Bay.
+MB Security is an internal tool operated by Saraya Bandar Jissah SAOC ("Muscat Bay") for security patrols within the Muscat Bay community, Sultanate of Oman. It is used only by Muscat Bay's own security team and the Muscat Bay staff who supervise it. Every account is created by Muscat Bay.
 
 ## What we collect and why
 - **Account details**: name, work email, employee number and phone number. Used to sign you in and to identify your patrol records. Where a login is shared, the guard name chosen at the start of a patrol is recorded with that shift for the same purpose.

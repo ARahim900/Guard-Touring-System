@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "MB Security",
+    "slug": "mb-patrol-portal",
+    "owner": "arpro900",
+    "ios": {
+      "bundleIdentifier": "com.muscatbay.patrol.supervisor"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "871e2a8c-3c95-4af1-9387-6c845ff9b6cf"
+      }
+    }
+  }
+}

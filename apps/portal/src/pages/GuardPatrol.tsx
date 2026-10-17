@@ -84,7 +84,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
     try {
       if (!shift || !active || !inWindow) throw new Error('Scanning is only available during your patrol.');
       if (!checkpoint) {
-        setConfirm({ kind: 'notice', tone: 'danger', title: 'Not one of tonight’s locations', message: 'This QR code is not on your patrol. Scan the MB Patrol label fixed at the location.' });
+        setConfirm({ kind: 'notice', tone: 'danger', title: 'Not one of tonight’s locations', message: 'This QR code is not on your patrol. Scan the QR label fixed at the location.' });
         return;
       }
       if (checkpoint.completed) {
@@ -126,7 +126,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           <div className="flex items-center gap-3">
             <img src="/apple-touch-icon.png" alt="" className="size-10 rounded-lg" />
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg text-white">{active ? 'Night patrol' : 'MB Patrol'}</h1>
+              <h1 className="truncate text-lg text-white">{active ? 'Night patrol' : 'MB Security'}</h1>
               <p className="truncate text-sm text-white/80">{active ? `${shift.on_duty_name ?? fullName} · ends by itself ${formatTime(shift.scheduled_end)}` : fullName}</p>
             </div>
             <button type="button" onClick={() => void leave()} disabled={overlay || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>

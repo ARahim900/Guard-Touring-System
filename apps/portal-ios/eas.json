@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/expo/eas-cli/main/schema/eas.schema.json",
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "scheme": "MBPatrol",
+        "buildConfiguration": "Release",
+        "image": "latest"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6823613060"
+      }
+    }
+  }
+}

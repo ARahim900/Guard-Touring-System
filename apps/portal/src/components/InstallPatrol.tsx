@@ -28,14 +28,14 @@ export function InstallPatrol() {
       const choice = await prompt.userChoice;
       if (choice.outcome === 'accepted') setInstalled(true);
       setPrompt(null);
-    } catch { setError('Use your browser menu to add MB Patrol to your home screen.'); }
+    } catch { setError('Use your browser menu to add MB Security to your home screen.'); }
   }
   if (installed) return null;
   return (
     <details className="rounded-md border border-border bg-white p-4 text-sm">
       <summary className="cursor-pointer font-semibold text-primary">Install on your phone</summary>
       <div className="mt-3 space-y-2 text-muted-foreground">
-        {prompt ? <Button type="button" icon={Download} onClick={() => void install()}>Install MB Patrol</Button> : null}
+        {prompt ? <Button type="button" icon={Download} onClick={() => void install()}>Install MB Security</Button> : null}
         <p><strong>iPhone:</strong> open this site in Safari → Share → Add to Home Screen. Keep “Open as Web App” enabled if shown.</p>
         <p><strong>Android:</strong> open in Chrome → menu → Add to Home screen / Install app.</p>
         <p>Sign in and start your shift with internet access. Keep the app open while scanning and uploading.</p>

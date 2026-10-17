@@ -60,3 +60,14 @@ jobs:
       # and are cleared by an Expo SDK upgrade, not by this repository.
       - run: npm audit --omit=dev --audit-level=high
         continue-on-error: true
+
+  portal-ios:
+    name: Supervisor iPhone app
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/portal-ios/ios
+    steps:
+      - uses: actions/checkout@v4
+      - run: pod install
+      - run: xcodebuild -workspace MBPatrol.xcworkspace -scheme MBPatrol -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
