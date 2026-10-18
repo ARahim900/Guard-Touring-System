@@ -94,8 +94,15 @@
   100% { transform: none; opacity: 1; }
 }
 .mb-pop { animation: mb-pop 180ms ease-out; }
+/* A location just verified arrives in Already scanned with a short green glow. */
+@keyframes mb-arrive {
+  0% { transform: scale(0.85); box-shadow: 0 0 0 0 rgba(13, 92, 56, 0.45); }
+  40% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(13, 92, 56, 0.18); }
+  100% { transform: none; box-shadow: 0 0 0 0 rgba(13, 92, 56, 0); }
+}
+.mb-arrive { animation: mb-arrive 900ms ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .mb-ring, .mb-pop { animation: none; }
+  .mb-ring, .mb-pop, .mb-arrive { animation: none; }
 }
 
 /* Leaflet sits under our modals. */

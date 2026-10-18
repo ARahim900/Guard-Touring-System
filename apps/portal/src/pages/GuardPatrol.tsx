@@ -1,15 +1,15 @@
 // =============================================================================
 // Guard patrol screen (phone): one job, scan every location once.
 // =============================================================================
-// Layout, top to bottom: a header with a progress ring, a "Next stop" card,
-// the locations still to visit as tiles (tap one to make it the next stop, so
-// the guard chooses the order), an "Already scanned" panel that each location
-// moves to once scanned, and a Scan
-// button fixed at the bottom within thumb reach. Any location can be scanned at
-// any time. Every scan ends in a full-screen pop-up that says plainly whether
-// the visit counted.
+// Layout, top to bottom: a header with a progress ring, the locations still to
+// visit as tiles (tap one at the location to open the camera for it, so the
+// guard chooses the order), an "Already scanned" panel that each location moves
+// to once scanned, and a Scan button fixed at the bottom within thumb reach.
+// The QR label decides which location is recorded, whichever tile was tapped.
+// Every scan ends in a full-screen pop-up that says plainly whether the visit
+// counted.
 // =============================================================================
-import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, LogOut, Navigation, RefreshCw, ScanLine, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, LogOut, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
@@ -38,10 +38,12 @@ function statusOf(checkpoint: PatrolCheckpoint, uploading: boolean): Status {
 function GuardTour({ userId, fullName, footer }: { userId: string; fullName: string; footer: ReactNode }) {
   const { signOut } = useAuth();
   const { snapshot, receipts, loading, syncing, cached, error, refresh } = useGuardPatrol(userId);
-  const [scanning, setScanning] = useState(false);
+  // false = camera closed; null = opened from the Scan button; a name = opened from that location's tile.
+  const [scanning, setScanning] = useState<false | null | string>(false);
+  // The location scanned last: its chip glows green in Already scanned once the pop-up closes.
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [nextId, setNextId] = useState<string | null>(null);
   const scanInProgress = useRef(false);
   const shift = snapshot?.shift;
   const active = shift?.status === 'active';
@@ -60,20 +62,13 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const verified = rows.filter((row) => row.status === 'verified').length;
   const uploading = rows.filter((row) => row.status === 'uploading').length;
   const review = rows.filter((row) => row.status === 'review').length;
-  // The guard's chosen next stop; once it is visited, the first remaining location takes its place.
-  const next = active ? toVisit.find((row) => row.checkpoint.checkpoint_id === nextId) ?? toVisit[0] : undefined;
-
-  function chooseNext(checkpointId: string) {
-    setNextId(checkpointId);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
 
   // The pop-up follows the saved receipt, so it turns green the moment the upload is confirmed.
   const shown: ConfirmState | null = confirm?.kind === 'receipt'
     ? { kind: 'receipt', receipt: receipts.find((item) => item.id === confirm.receipt.id) ?? confirm.receipt } : confirm;
 
   // While the camera or a pop-up is open, the page behind it cannot be reached; afterwards focus returns to Scan.
-  const overlay = scanning || shown !== null;
+  const overlay = scanning !== false || shown !== null;
   const scanButton = useRef<HTMLButtonElement>(null);
   const wasOverlay = useRef(false);
   useEffect(() => {
@@ -82,8 +77,8 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   }, [overlay]);
   const thisShift = receipts.filter((receipt) => !shift || receipt.shiftId === shift.id);
 
-  function openScanner() {
-    setActionError(null); setConfirm(null); setScanning(true);
+  function openScanner(target: string | null = null) {
+    setActionError(null); setConfirm(null); setScanning(target);
   }
 
   async function record(code: string, method: 'qr' | 'barcode') {
@@ -106,6 +101,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         setConfirm({ kind: 'notice', tone: 'info', name: checkpoint.checkpoint_name, title: 'Already saved on this phone', message: 'This visit is waiting to upload. It uploads by itself when there is a connection.' });
         return;
       }
+      setLastScanned(checkpoint.checkpoint_id);
       setConfirm({ kind: 'checking', name: checkpoint.checkpoint_name, message: 'Getting your GPS position…' });
       const position = await captureLocation();
       const receipt: PatrolReceipt = {
@@ -165,7 +161,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           </div>
         ) : null}
 
-        {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(true); }} /> : null}
+        {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(null); }} /> : null}
         {active && !inWindow ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">This patrol has ended. Tap Refresh to load the next one.</p> : null}
         {(error || cached || (active && !inWindow)) && !pending.length ? (
           <button type="button" onClick={() => void refresh(true)} disabled={syncing} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-medium text-primary disabled:opacity-50"><RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />Refresh</button>
@@ -183,11 +179,10 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         ) : null}
 
         {!checkpoints.length ? <p className="rounded-xl bg-muted px-4 py-3">Your manager needs to add the patrol locations.</p> : null}
-        {next ? <NextStop row={next} /> : null}
         {active && toVisit.length ? (
-          <Section title="To visit" count={toVisit.length} hint={toVisit.length > 1 ? 'Tap a location to make it your next stop. Once scanned, it moves to Already scanned.' : 'Once scanned, it moves to Already scanned.'}>
+          <Section title="To visit" count={toVisit.length} hint="At a location, tap it to scan its QR label. Once verified, it turns green and moves to Already scanned.">
             <ul className="grid grid-cols-2 gap-3">
-              {toVisit.map((row) => <li key={row.checkpoint.checkpoint_id}><LocationTile row={row} selected={row === next} onChoose={() => chooseNext(row.checkpoint.checkpoint_id)} /></li>)}
+              {toVisit.map((row) => <li key={row.checkpoint.checkpoint_id}><LocationTile row={row} disabled={!canScan || scanning !== false || shown?.kind === 'checking'} onScan={() => openScanner(row.checkpoint.checkpoint_name)} /></li>)}
             </ul>
           </Section>
         ) : null}
@@ -200,7 +195,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           <section aria-labelledby="already-scanned" className="rounded-3xl border border-success bg-success-bg p-4">
             <h2 id="already-scanned" className="mb-3 flex items-center gap-2 text-base text-success-text"><CheckCircle2 className="size-5" aria-hidden="true" />Already scanned
               <span className="ml-auto rounded-full bg-card px-3 py-1 text-sm font-semibold tabular-nums">{visited.length}</span></h2>
-            <ul className="flex flex-wrap gap-2">{visited.map((row) => <li key={row.checkpoint.checkpoint_id}><VisitedChip row={row} /></li>)}</ul>
+            <ul className="flex flex-wrap gap-2">{visited.map((row) => <li key={row.checkpoint.checkpoint_id}><VisitedChip row={row} fresh={!overlay && row.checkpoint.checkpoint_id === lastScanned} /></li>)}</ul>
           </section>
         ) : null}
 
@@ -219,16 +214,16 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
       {active ? (
         <div inert={overlay} className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
           <div className="mx-auto max-w-xl">
-            <button ref={scanButton} type="button" onClick={openScanner} disabled={!canScan || scanning || shown?.kind === 'checking'} className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-lg font-semibold text-white shadow-card active:bg-primary-hover disabled:opacity-50">
+            <button ref={scanButton} type="button" onClick={() => openScanner()} disabled={!canScan || scanning !== false || shown?.kind === 'checking'} className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-lg font-semibold text-white shadow-card active:bg-primary-hover disabled:opacity-50">
               <ScanLine className="size-6" aria-hidden="true" />Scan location
             </button>
           </div>
         </div>
       ) : null}
 
-      {scanning && active ? <PatrolScanner fullscreen onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
+      {scanning !== false && active ? <PatrolScanner fullscreen target={scanning ?? undefined} onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
       {shown ? <ScanConfirm state={shown} done={verified} total={checkpoints.length} canScan={canScan} busy={syncing}
-        onClose={() => setConfirm(null)} onScan={openScanner} onRetryUpload={() => void refresh(true)} /> : null}
+        onClose={() => setConfirm(null)} onScan={() => openScanner()} onRetryUpload={() => void refresh(true)} /> : null}
     </>
   );
 }
@@ -262,31 +257,20 @@ function Section({ title, count, hint, children }: { title: string; count: numbe
   );
 }
 
-function NextStop({ row: { checkpoint, status } }: { row: Row }) {
-  return (
-    <section aria-label="Next stop" className="rounded-3xl border border-border bg-card p-5 shadow-card">
-      <p className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">Next stop</p>
-      <h2 className="mt-1 text-2xl break-words">{checkpoint.checkpoint_name}</h2>
-      {status === 'rejected'
-        ? <p className="mt-1 text-sm font-semibold text-danger-text">Not counted last time · scan again at the location</p>
-        : <p className="mt-1 text-sm text-muted-foreground">Go to this location and scan its QR label.</p>}
-      <a className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary-light text-base font-semibold text-primary active:bg-secondary" target="_blank" rel="noreferrer"
-        href={`https://www.google.com/maps/dir/?api=1&destination=${checkpoint.latitude},${checkpoint.longitude}`}><Navigation className="size-5" aria-hidden="true" />Directions</a>
-    </section>
-  );
-}
-
-function LocationTile({ row: { checkpoint, status }, selected, onChoose }: { row: Row; selected: boolean; onChoose: () => void }) {
+function LocationTile({ row: { checkpoint, status }, disabled, onScan }: { row: Row; disabled: boolean; onScan: () => void }) {
   const rejected = status === 'rejected';
   return (
-    <button type="button" onClick={onChoose} aria-pressed={selected} aria-label={`${checkpoint.checkpoint_name}${rejected ? ', not counted, scan again' : ''}. ${selected ? 'Your next stop.' : 'Make this your next stop.'}`}
-      className={`flex h-full min-h-24 w-full flex-col justify-between gap-2 rounded-2xl border p-3.5 text-left transition-colors ${selected ? 'border-primary bg-primary text-white shadow-card' : rejected ? 'border-danger bg-danger-bg' : 'border-border bg-card active:bg-muted'}`}>
-      <span className="flex items-start justify-between gap-2">
+    <div className="relative h-full">
+      <button type="button" onClick={onScan} disabled={disabled} aria-label={`Scan ${checkpoint.checkpoint_name}${rejected ? ', not counted last time' : ''}`}
+        className={`flex h-full min-h-28 w-full flex-col justify-between gap-3 rounded-2xl border p-3.5 pr-12 text-left shadow-sm transition active:scale-[0.98] disabled:opacity-60 ${rejected ? 'border-danger bg-danger-bg' : 'border-border bg-card active:bg-muted'}`}>
         <span className="text-base leading-snug font-semibold break-words">{checkpoint.checkpoint_name}</span>
-        {rejected && !selected ? <XCircle className="size-5 shrink-0 text-danger-text" aria-hidden="true" /> : <span aria-hidden="true" className={`mt-0.5 size-5 shrink-0 rounded-full border-2 ${selected ? 'border-white bg-white/20' : 'border-border'}`} />}
-      </span>
-      <span className={`text-sm ${selected ? 'font-semibold text-white' : rejected ? 'font-semibold text-danger-text' : 'text-muted-foreground'}`}>{selected ? 'Next stop' : rejected ? 'Scan again' : 'To visit'}</span>
-    </button>
+        <span className={`inline-flex items-center gap-1.5 text-sm font-semibold ${rejected ? 'text-danger-text' : 'text-primary'}`}>
+          <ScanLine className="size-4" aria-hidden="true" />{rejected ? 'Scan again' : 'Tap to scan'}
+        </span>
+      </button>
+      <a className="absolute top-1.5 right-1.5 flex size-11 items-center justify-center rounded-full text-primary active:bg-muted" aria-label={`Directions to ${checkpoint.checkpoint_name}`} target="_blank" rel="noreferrer"
+        href={`https://www.google.com/maps/dir/?api=1&destination=${checkpoint.latitude},${checkpoint.longitude}`}><Navigation className="size-5" aria-hidden="true" /></a>
+    </div>
   );
 }
 
@@ -296,10 +280,10 @@ const CHIP: Record<Exclude<Status, 'todo' | 'rejected'>, { style: string; icon: 
   review: { style: 'bg-card text-warning-text', icon: <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />, label: () => 'in review' },
 };
 
-function VisitedChip({ row: { checkpoint, status } }: { row: Row }) {
+function VisitedChip({ row: { checkpoint, status }, fresh }: { row: Row; fresh: boolean }) {
   const chip = CHIP[status as keyof typeof CHIP];
   return (
-    <span className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${chip.style}`}>
+    <span className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${chip.style} ${fresh ? 'mb-arrive' : ''}`}>
       {chip.icon}{checkpoint.checkpoint_name}<span className="font-normal tabular-nums opacity-80">· {chip.label(checkpoint)}</span>
     </span>
   );
