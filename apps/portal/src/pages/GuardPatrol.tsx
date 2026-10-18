@@ -9,7 +9,7 @@
 // Every scan ends in a full-screen pop-up that says plainly whether the visit
 // counted.
 // =============================================================================
-import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, LogOut, Navigation, RefreshCw, ScanLine } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
@@ -42,6 +42,8 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const [scanning, setScanning] = useState<false | null | string>(false);
   // The location scanned last: its chip glows green in Already scanned once the pop-up closes.
   const [lastScanned, setLastScanned] = useState<string | null>(null);
+  // Every location verified: the guard may open the start card for another round.
+  const [newRound, setNewRound] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const scanInProgress = useRef(false);
@@ -133,9 +135,11 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           <div className="flex items-center gap-3">
             <img src="/apple-touch-icon.png" alt="" className="size-10 rounded-xl" />
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg text-white">{active ? 'Night patrol' : 'MB Security'}</h1>
+              <h1 className="truncate text-lg text-white">{active ? 'Patrol' : 'MB Security'}</h1>
               <p className="truncate text-sm text-white/80">{active ? `${shift.on_duty_name ?? fullName} · ends by itself ${formatTime(shift.scheduled_end)}` : fullName}</p>
             </div>
+            <Link to="/" aria-label="Dashboard" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10"><LayoutDashboard className="size-5" aria-hidden="true" /></Link>
+            <Link to="/reports" aria-label="Daily reports" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10"><FileText className="size-5" aria-hidden="true" /></Link>
             <button type="button" onClick={() => void leave()} disabled={overlay || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>
           </div>
           {active && checkpoints.length ? (
@@ -161,16 +165,22 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           </div>
         ) : null}
 
-        {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} endTime={snapshot?.endTime ?? null} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(null); }} /> : null}
+        {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(null); }} /> : null}
         {active && !inWindow ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">This patrol has ended. Tap Refresh to load the next one.</p> : null}
         {(error || cached || (active && !inWindow)) && !pending.length ? (
           <button type="button" onClick={() => void refresh(true)} disabled={syncing} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-medium text-primary disabled:opacity-50"><RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />Refresh</button>
         ) : null}
         {active && checkpoints.length > 0 && verified === checkpoints.length ? (
-          <div role="status" className="flex items-center gap-3 rounded-2xl bg-success-bg px-5 py-4 text-success-text">
-            <CheckCircle2 className="size-7 shrink-0" aria-hidden="true" />
-            <p className="font-semibold">All {checkpoints.length} locations verified. Nothing else to do; the patrol ends by itself.</p>
-          </div>
+          <>
+            <div role="status" className="rounded-2xl bg-success-bg px-5 py-4 text-success-text">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="size-7 shrink-0" aria-hidden="true" />
+                <p className="font-semibold">All {checkpoints.length} locations verified. This round is complete.</p>
+              </div>
+              {!newRound ? <button type="button" onClick={() => setNewRound(true)} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-success-text text-base font-semibold text-white"><RefreshCw className="size-5" aria-hidden="true" />Start a new round</button> : null}
+            </div>
+            {newRound ? <GuardShiftStart key="new-round" title="Start a new round" names={snapshot?.guardNames ?? []} disabled={!snapshot || cached || syncing || pending.length > 0} onStarted={async () => { setNewRound(false); await refresh(true); setScanning(null); }} /> : null}
+          </>
         ) : active && checkpoints.length > 0 && !toVisit.length ? (
           <div role="status" className="flex items-center gap-3 rounded-2xl bg-warning-bg px-5 py-4 text-warning-text">
             <AlertTriangle className="size-7 shrink-0" aria-hidden="true" />

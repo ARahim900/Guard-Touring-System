@@ -53,7 +53,7 @@ export function PatrolActivity({ names }: { names: string[] }) {
           const done = visits.filter((visit) => visit.completed).length;
           const review = visits.filter((visit) => !visit.completed && visit.validation === 'flagged').length;
           const ended = Date.parse(shift.scheduled_end) < Date.now();
-          const label = shift.status === 'active' && !ended ? 'In progress' : !ended ? 'Not started' : 'Shift ended';
+          const label = shift.status === 'completed' && !ended ? 'Completed' : shift.status === 'active' && !ended ? 'In progress' : !ended ? 'Not started' : 'Shift ended';
           return <li key={shift.id} className="space-y-3 py-4 first:pt-0 last:pb-0">
             <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">{shift.on_duty_name ?? 'Guard not confirmed'}</p><span className="rounded-full bg-secondary-light px-3 py-1 text-xs font-medium text-primary">{label}</span></div>
             <p className="text-sm text-muted-foreground">{formatDay(shift.scheduled_start)} · {formatTime(shift.scheduled_start)}–{formatTime(shift.scheduled_end)}</p>

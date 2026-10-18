@@ -3,12 +3,12 @@
 // on desktop, and a bottom bar on phones and tablets (no sideways scrolling).
 // The bars sit at z-40, below dialogs (z-50); Leaflet is isolated in index.css.
 // =============================================================================
-import { Bell, ChevronDown, FileText, LogOut, Map as MapIcon, MapPin, Menu, Moon, ScanLine, TriangleAlert, X, type LucideIcon } from 'lucide-react';
+import { Bell, ChevronDown, FileText, LayoutDashboard, LogOut, Map as MapIcon, MapPin, Menu, Moon, ScanLine, TriangleAlert, X, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 
 import { BrandMark } from '@/components/BrandMark';
-import { useAlarms } from '@/context/AlarmContext';
+import { useOpenAlarmCount } from '@/context/AlarmContext';
 import { useAuth } from '@/context/AuthContext';
 import type { UserRole } from '@/lib/types';
 
@@ -21,7 +21,7 @@ interface NavPage {
 }
 
 const pages: NavPage[] = [
-  { to: '/', label: 'Night patrol', short: 'Patrol', icon: Moon },
+  { to: '/', label: 'Patrol', short: 'Patrol', icon: Moon },
   { to: '/alarms', label: 'Alarms', short: 'Alarms', icon: Bell },
   { to: '/live', label: 'Live map', short: 'Map', icon: MapIcon },
   { to: '/incidents', label: 'Incidents', icon: TriangleAlert },
@@ -31,6 +31,12 @@ const pages: NavPage[] = [
 ];
 const barPages = pages.filter((page) => page.short);
 const morePages = pages.filter((page) => !page.short);
+/** Security accounts: scanning plus read-only Dashboard and Reports. */
+const guardPages: NavPage[] = [
+  { to: '/guard', label: 'Scan', short: 'Scan', icon: ScanLine },
+  { to: '/', label: 'Dashboard', short: 'Dashboard', icon: LayoutDashboard },
+  { to: '/reports', label: 'Reports', short: 'Reports', icon: FileText },
+];
 
 const ROLE_LABEL: Record<UserRole, string> = { admin: 'Admin', supervisor: 'Supervisor', guard: 'Guard' };
 
@@ -187,7 +193,10 @@ function MoreSheet({ open, onClose, returnFocusRef }: { open: boolean; onClose: 
 }
 
 export function Layout() {
-  const { openCount } = useAlarms();
+  const openCount = useOpenAlarmCount();
+  const { profile } = useAuth();
+  const guard = profile?.role === 'guard';
+  const navPages = guard ? guardPages : pages;
   const { pathname } = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const closeMore = useCallback(() => setMoreOpen(false), []);
@@ -211,7 +220,7 @@ export function Layout() {
         </header>
         <nav aria-label="Main navigation" className="hidden border-b border-border bg-card px-3 lg:block">
           <ul className="mx-auto flex max-w-5xl gap-1">
-            {pages.map(({ to, label, icon: Icon }) => (
+            {navPages.map(({ to, label, icon: Icon }) => (
               <li key={to}>
                 <NavLink
                   to={to}
@@ -231,8 +240,8 @@ export function Layout() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-6 lg:pb-6"><Outlet /></main>
 
       <nav aria-label="Main navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
-        <ul className="grid grid-cols-5">
-          {barPages.map(({ to, short, icon: Icon }) => (
+        <ul className={`grid ${guard ? 'grid-cols-3' : 'grid-cols-5'}`}>
+          {(guard ? guardPages : barPages).map(({ to, short, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}
@@ -252,7 +261,7 @@ export function Layout() {
               </NavLink>
             </li>
           ))}
-          <li>
+          {guard ? null : <li>
             <button
               ref={moreButtonRef}
               type="button"
@@ -264,7 +273,7 @@ export function Layout() {
               {moreActive ? <span aria-hidden="true" className="absolute inset-x-3 top-0 h-[3px] rounded-b-sm bg-secondary" /> : null}
               <Menu aria-hidden="true" className="size-5" />More
             </button>
-          </li>
+          </li>}
         </ul>
       </nav>
       <MoreSheet open={moreOpen} onClose={closeMore} returnFocusRef={moreButtonRef} />

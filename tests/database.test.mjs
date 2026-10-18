@@ -95,9 +95,11 @@ test('date-range report keeps after-midnight scans with the shift start date', a
   await assert.rejects(db.query("select public.patrol_report('2026-09-11','2026-09-10')"),/valid start/);
 });
 
-test('guard cannot generate staff reports or read another guard records', async () => {
+test('a guard report shows only its own patrols; no access to another guard records', async () => {
+  await asUser(guard);
+  assert.equal((await db.query("select public.patrol_report('2026-09-10','2026-09-10') as report")).rows[0].report.shifts.length,1);
   await asUser(other);
-  await assert.rejects(db.query("select public.patrol_report('2026-09-10','2026-09-10')"),/Only supervisors/);
+  assert.equal((await db.query("select public.patrol_report('2026-09-10','2026-09-10') as report")).rows[0].report.shifts.length,0);
   const { rows } = await db.query('select id from public.scans');
   assert.equal(rows.length,0);
   await assert.rejects(scan(),/not assigned/);

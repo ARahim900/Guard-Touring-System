@@ -16,17 +16,17 @@ export function buildReportPdf(report: PatrolReport): jsPDF {
   doc.rect(0, 0, width, 25, 'F');
   doc.setTextColor(255);
   doc.setFontSize(16);
-  doc.text('Muscat Bay | Night patrol report', 14, 12);
+  doc.text('Muscat Bay | Patrol report', 14, 12);
   doc.setFontSize(10);
   doc.text(`${report.from_date} to ${report.to_date} | Muscat time (UTC+4)`, 14, 20);
   doc.setTextColor(...PRIMARY);
   doc.setFontSize(10);
   doc.text(`Required: ${totals.required}   Verified: ${totals.verified}   Awaiting review: ${totals.review}   Rejected: ${totals.rejected}   Unvisited: ${totals.unvisited}`, 14, 34);
   doc.text('One verified visit per checkpoint per shift. Pending phone uploads are not visible until received.', 14, 41);
-  doc.text(`Not yet visited (shift still open): ${totals.remaining} | Missing attachments: ${totals.missingAttachments} | Nights needing explanation: ${attention} of ${nights.length}`, 14, 48);
+  doc.text(`Not yet visited (shift still open): ${totals.remaining} | Missing attachments: ${totals.missingAttachments} | Days needing explanation: ${attention} of ${nights.length}`, 14, 48);
   autoTable(doc, {
     startY: 55,
-    head: [['Night of', 'Result', 'Verified / required', 'Guard on duty']],
+    head: [['Date', 'Result', 'Verified / required', 'Guard on duty']],
     body: nights.map((n) => [n.date, n.status, n.required ? `${n.verified} / ${n.required}` : '-', n.guards.join(', ') || '-']),
     styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: PRIMARY },
     margin: { bottom: 20 },
