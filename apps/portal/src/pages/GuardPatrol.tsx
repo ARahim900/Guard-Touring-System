@@ -3,7 +3,8 @@
 // =============================================================================
 // Layout, top to bottom: a header with a progress ring, a "Next stop" card,
 // the locations still to visit as tiles (tap one to make it the next stop, so
-// the guard chooses the order), the visited ones as green chips, and a Scan
+// the guard chooses the order), an "Already scanned" panel that each location
+// moves to once scanned, and a Scan
 // button fixed at the bottom within thumb reach. Any location can be scanned at
 // any time. Every scan ends in a full-screen pop-up that says plainly whether
 // the visit counted.
@@ -184,7 +185,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         {!checkpoints.length ? <p className="rounded-xl bg-muted px-4 py-3">Your manager needs to add the patrol locations.</p> : null}
         {next ? <NextStop row={next} /> : null}
         {active && toVisit.length ? (
-          <Section title="To visit" count={toVisit.length} hint={toVisit.length > 1 ? 'Tap a location to make it your next stop.' : undefined}>
+          <Section title="To visit" count={toVisit.length} hint={toVisit.length > 1 ? 'Tap a location to make it your next stop. Once scanned, it moves to Already scanned.' : 'Once scanned, it moves to Already scanned.'}>
             <ul className="grid grid-cols-2 gap-3">
               {toVisit.map((row) => <li key={row.checkpoint.checkpoint_id}><LocationTile row={row} selected={row === next} onChoose={() => chooseNext(row.checkpoint.checkpoint_id)} /></li>)}
             </ul>
@@ -196,9 +197,11 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           </Section>
         ) : null}
         {active && visited.length ? (
-          <Section title="Visited" count={visited.length}>
+          <section aria-labelledby="already-scanned" className="rounded-3xl border border-success bg-success-bg p-4">
+            <h2 id="already-scanned" className="mb-3 flex items-center gap-2 text-base text-success-text"><CheckCircle2 className="size-5" aria-hidden="true" />Already scanned
+              <span className="ml-auto rounded-full bg-card px-3 py-1 text-sm font-semibold tabular-nums">{visited.length}</span></h2>
             <ul className="flex flex-wrap gap-2">{visited.map((row) => <li key={row.checkpoint.checkpoint_id}><VisitedChip row={row} /></li>)}</ul>
-          </Section>
+          </section>
         ) : null}
 
         {thisShift.length ? (
@@ -288,9 +291,9 @@ function LocationTile({ row: { checkpoint, status }, selected, onChoose }: { row
 }
 
 const CHIP: Record<Exclude<Status, 'todo' | 'rejected'>, { style: string; icon: ReactNode; label: (checkpoint: PatrolCheckpoint) => string }> = {
-  verified: { style: 'bg-success-bg text-success-text', icon: <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />, label: (c) => formatTime(c.scanned_at ?? '') },
-  uploading: { style: 'bg-warning-bg text-warning-text', icon: <CloudUpload className="size-4 shrink-0" aria-hidden="true" />, label: () => 'uploading' },
-  review: { style: 'bg-warning-bg text-warning-text', icon: <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />, label: () => 'in review' },
+  verified: { style: 'bg-card text-success-text', icon: <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />, label: (c) => formatTime(c.scanned_at ?? '') },
+  uploading: { style: 'bg-card text-warning-text', icon: <CloudUpload className="size-4 shrink-0" aria-hidden="true" />, label: () => 'uploading' },
+  review: { style: 'bg-card text-warning-text', icon: <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />, label: () => 'in review' },
 };
 
 function VisitedChip({ row: { checkpoint, status } }: { row: Row }) {
