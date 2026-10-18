@@ -7,8 +7,9 @@
 @import "leaflet/dist/leaflet.css";
 
 @theme {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Roboto Slab Variable", Georgia, serif;
+  /* DM Sans for all text, as in the Muscat Bay O&M app. */
+  --font-sans: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-sans);
 
   /* Brand minimum on screen is 14px, so the smallest size is 14px. */
   --text-xs: 0.875rem;

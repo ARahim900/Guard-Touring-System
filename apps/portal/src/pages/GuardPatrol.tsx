@@ -1,10 +1,13 @@
 // =============================================================================
 // Guard patrol screen (phone): one job, scan every location once.
 // =============================================================================
-// Layout, top to bottom: a slim header with the patrol's progress, the list of
-// locations split into "To visit" and "Visited", and a Scan button fixed at the
-// bottom of the screen within thumb reach. Every scan ends in a full-screen
-// pop-up that says plainly whether the visit counted.
+// Layout, top to bottom: a header with a progress ring, a "Next stop" card,
+// the locations still to visit as tiles (tap one to make it the next stop, so
+// the guard chooses the order), an "Already scanned" panel that each location
+// moves to once scanned, and a Scan
+// button fixed at the bottom within thumb reach. Any location can be scanned at
+// any time. Every scan ends in a full-screen pop-up that says plainly whether
+// the visit counted.
 // =============================================================================
 import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, LogOut, Navigation, RefreshCw, ScanLine, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -38,6 +41,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const [scanning, setScanning] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [nextId, setNextId] = useState<string | null>(null);
   const scanInProgress = useRef(false);
   const shift = snapshot?.shift;
   const active = shift?.status === 'active';
@@ -56,6 +60,13 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const verified = rows.filter((row) => row.status === 'verified').length;
   const uploading = rows.filter((row) => row.status === 'uploading').length;
   const review = rows.filter((row) => row.status === 'review').length;
+  // The guard's chosen next stop; once it is visited, the first remaining location takes its place.
+  const next = active ? toVisit.find((row) => row.checkpoint.checkpoint_id === nextId) ?? toVisit[0] : undefined;
+
+  function chooseNext(checkpointId: string) {
+    setNextId(checkpointId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   // The pop-up follows the saved receipt, so it turns green the moment the upload is confirmed.
   const shown: ConfirmState | null = confirm?.kind === 'receipt'
@@ -124,7 +135,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
       <header inert={overlay} className="sticky top-0 z-30 bg-primary px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-4 text-white shadow-card">
         <div className="mx-auto max-w-xl">
           <div className="flex items-center gap-3">
-            <img src="/apple-touch-icon.png" alt="" className="size-10 rounded-lg" />
+            <img src="/apple-touch-icon.png" alt="" className="size-10 rounded-xl" />
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg text-white">{active ? 'Night patrol' : 'MB Security'}</h1>
               <p className="truncate text-sm text-white/80">{active ? `${shift.on_duty_name ?? fullName} · ends by itself ${formatTime(shift.scheduled_end)}` : fullName}</p>
@@ -132,13 +143,11 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
             <button type="button" onClick={() => void leave()} disabled={overlay || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>
           </div>
           {active && checkpoints.length ? (
-            <div className="mt-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-base font-semibold text-white"><span className="text-2xl tabular-nums">{verified}</span> of {checkpoints.length} verified</p>
-                {uploading || review ? <p className="text-sm text-white/80">{[uploading ? `${uploading} uploading` : '', review ? `${review} in review` : ''].filter(Boolean).join(' · ')}</p> : null}
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label="Locations verified" aria-valuemin={0} aria-valuemax={checkpoints.length} aria-valuenow={verified}>
-                <div className="h-full rounded-full bg-secondary transition-[width] duration-500" style={{ width: `${(verified / checkpoints.length) * 100}%` }} />
+            <div className="mt-4 flex items-center gap-4 rounded-2xl bg-white/10 px-4 py-3">
+              <ProgressRing done={verified} total={checkpoints.length} />
+              <div className="min-w-0">
+                <p className="text-lg font-semibold text-white">{verified} of {checkpoints.length} verified</p>
+                <p className="text-sm text-white/80">{[toVisit.length ? `${toVisit.length} to go` : 'All scanned', uploading ? `${uploading} uploading` : '', review ? `${review} in review` : ''].filter(Boolean).join(' · ')}</p>
               </div>
             </div>
           ) : null}
@@ -174,8 +183,26 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         ) : null}
 
         {!checkpoints.length ? <p className="rounded-xl bg-muted px-4 py-3">Your manager needs to add the patrol locations.</p> : null}
-        {toVisit.length ? <LocationGroup title={active ? 'To visit' : 'Tonight’s locations'} rows={toVisit} active={active} /> : null}
-        {visited.length ? <LocationGroup title="Visited" rows={visited} active={active} /> : null}
+        {next ? <NextStop row={next} /> : null}
+        {active && toVisit.length ? (
+          <Section title="To visit" count={toVisit.length} hint={toVisit.length > 1 ? 'Tap a location to make it your next stop. Once scanned, it moves to Already scanned.' : 'Once scanned, it moves to Already scanned.'}>
+            <ul className="grid grid-cols-2 gap-3">
+              {toVisit.map((row) => <li key={row.checkpoint.checkpoint_id}><LocationTile row={row} selected={row === next} onChoose={() => chooseNext(row.checkpoint.checkpoint_id)} /></li>)}
+            </ul>
+          </Section>
+        ) : null}
+        {!active && rows.length ? (
+          <Section title="Tonight’s locations" count={rows.length}>
+            <ul className="flex flex-wrap gap-2">{rows.map((row) => <li key={row.checkpoint.checkpoint_id} className="rounded-full border border-border bg-card px-3 py-2 text-sm font-medium">{row.checkpoint.checkpoint_name}</li>)}</ul>
+          </Section>
+        ) : null}
+        {active && visited.length ? (
+          <section aria-labelledby="already-scanned" className="rounded-3xl border border-success bg-success-bg p-4">
+            <h2 id="already-scanned" className="mb-3 flex items-center gap-2 text-base text-success-text"><CheckCircle2 className="size-5" aria-hidden="true" />Already scanned
+              <span className="ml-auto rounded-full bg-card px-3 py-1 text-sm font-semibold tabular-nums">{visited.length}</span></h2>
+            <ul className="flex flex-wrap gap-2">{visited.map((row) => <li key={row.checkpoint.checkpoint_id}><VisitedChip row={row} /></li>)}</ul>
+          </section>
+        ) : null}
 
         {thisShift.length ? (
           <details className="rounded-xl border border-border bg-card px-4 py-3">
@@ -206,42 +233,75 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   );
 }
 
-const ROW: Record<Status, { label: (checkpoint: PatrolCheckpoint, active: boolean) => string; text: string }> = {
-  verified: { label: (c) => `Verified · ${formatTime(c.scanned_at ?? '')}`, text: 'text-success-text' },
-  uploading: { label: () => 'Saved on phone · waiting to upload', text: 'font-medium text-warning-text' },
-  review: { label: () => 'Recorded · awaiting supervisor review', text: 'font-medium text-warning-text' },
-  rejected: { label: () => 'Not counted · scan again at the location', text: 'font-semibold text-danger-text' },
-  todo: { label: (_c, active) => active ? 'Not yet visited' : 'Ready when you start', text: 'text-muted-foreground' },
-};
+type Row = { checkpoint: PatrolCheckpoint; status: Status };
 
-function StatusIcon({ status }: { status: Status }) {
-  if (status === 'verified') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-success-text text-white"><CheckCircle2 className="size-6" aria-hidden="true" /></span>;
-  if (status === 'uploading') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning-text"><CloudUpload className="size-5" aria-hidden="true" /></span>;
-  if (status === 'review') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning-text"><AlertTriangle className="size-5" aria-hidden="true" /></span>;
-  if (status === 'rejected') return <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger-text"><XCircle className="size-6" aria-hidden="true" /></span>;
-  return <span aria-hidden="true" className="size-10 shrink-0 rounded-full border-2 border-border bg-card" />;
+function ProgressRing({ done, total }: { done: number; total: number }) {
+  const r = 26;
+  const length = 2 * Math.PI * r;
+  return (
+    <div className="relative size-16 shrink-0" role="progressbar" aria-label="Locations verified" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
+      <svg viewBox="0 0 64 64" className="size-full -rotate-90" aria-hidden="true">
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="7" className="stroke-white/20" />
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="7" strokeLinecap="round" className="stroke-secondary transition-[stroke-dashoffset] duration-500"
+          strokeDasharray={length} strokeDashoffset={length * (1 - (total ? done / total : 0))} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-base font-semibold text-white tabular-nums">{total ? Math.round((done / total) * 100) : 0}%</span>
+    </div>
+  );
 }
 
-function LocationGroup({ title, rows, active }: { title: string; rows: { checkpoint: PatrolCheckpoint; status: Status }[]; active: boolean }) {
+function Section({ title, count, hint, children }: { title: string; count: number; hint?: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 flex items-center justify-between px-1 text-base">{title}<span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold text-muted-foreground tabular-nums">{rows.length}</span></h2>
-      <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-        {rows.map(({ checkpoint, status }) => (
-          <li key={checkpoint.checkpoint_id} className={`flex items-center gap-3 px-4 py-3 ${status === 'verified' ? 'bg-success-bg/40' : ''}`}>
-            <StatusIcon status={status} />
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-medium break-words">{checkpoint.checkpoint_name}</p>
-              <p className={`text-sm ${ROW[status].text}`}>{ROW[status].label(checkpoint, active)}</p>
-            </div>
-            {status === 'todo' || status === 'rejected' ? (
-              <a className="flex size-11 shrink-0 items-center justify-center rounded-full text-primary hover:bg-muted" aria-label={`Directions to ${checkpoint.checkpoint_name}`} target="_blank" rel="noreferrer"
-                href={`https://www.google.com/maps/dir/?api=1&destination=${checkpoint.latitude},${checkpoint.longitude}`}><Navigation className="size-5" aria-hidden="true" /></a>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      <div className="mb-3 px-1">
+        <h2 className="flex items-center justify-between text-base">{title}<span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold text-muted-foreground tabular-nums">{count}</span></h2>
+        {hint ? <p className="mt-1 text-sm text-muted-foreground">{hint}</p> : null}
+      </div>
+      {children}
     </section>
+  );
+}
+
+function NextStop({ row: { checkpoint, status } }: { row: Row }) {
+  return (
+    <section aria-label="Next stop" className="rounded-3xl border border-border bg-card p-5 shadow-card">
+      <p className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">Next stop</p>
+      <h2 className="mt-1 text-2xl break-words">{checkpoint.checkpoint_name}</h2>
+      {status === 'rejected'
+        ? <p className="mt-1 text-sm font-semibold text-danger-text">Not counted last time · scan again at the location</p>
+        : <p className="mt-1 text-sm text-muted-foreground">Go to this location and scan its QR label.</p>}
+      <a className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary-light text-base font-semibold text-primary active:bg-secondary" target="_blank" rel="noreferrer"
+        href={`https://www.google.com/maps/dir/?api=1&destination=${checkpoint.latitude},${checkpoint.longitude}`}><Navigation className="size-5" aria-hidden="true" />Directions</a>
+    </section>
+  );
+}
+
+function LocationTile({ row: { checkpoint, status }, selected, onChoose }: { row: Row; selected: boolean; onChoose: () => void }) {
+  const rejected = status === 'rejected';
+  return (
+    <button type="button" onClick={onChoose} aria-pressed={selected} aria-label={`${checkpoint.checkpoint_name}${rejected ? ', not counted, scan again' : ''}. ${selected ? 'Your next stop.' : 'Make this your next stop.'}`}
+      className={`flex h-full min-h-24 w-full flex-col justify-between gap-2 rounded-2xl border p-3.5 text-left transition-colors ${selected ? 'border-primary bg-primary text-white shadow-card' : rejected ? 'border-danger bg-danger-bg' : 'border-border bg-card active:bg-muted'}`}>
+      <span className="flex items-start justify-between gap-2">
+        <span className="text-base leading-snug font-semibold break-words">{checkpoint.checkpoint_name}</span>
+        {rejected && !selected ? <XCircle className="size-5 shrink-0 text-danger-text" aria-hidden="true" /> : <span aria-hidden="true" className={`mt-0.5 size-5 shrink-0 rounded-full border-2 ${selected ? 'border-white bg-white/20' : 'border-border'}`} />}
+      </span>
+      <span className={`text-sm ${selected ? 'font-semibold text-white' : rejected ? 'font-semibold text-danger-text' : 'text-muted-foreground'}`}>{selected ? 'Next stop' : rejected ? 'Scan again' : 'To visit'}</span>
+    </button>
+  );
+}
+
+const CHIP: Record<Exclude<Status, 'todo' | 'rejected'>, { style: string; icon: ReactNode; label: (checkpoint: PatrolCheckpoint) => string }> = {
+  verified: { style: 'bg-card text-success-text', icon: <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />, label: (c) => formatTime(c.scanned_at ?? '') },
+  uploading: { style: 'bg-card text-warning-text', icon: <CloudUpload className="size-4 shrink-0" aria-hidden="true" />, label: () => 'uploading' },
+  review: { style: 'bg-card text-warning-text', icon: <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />, label: () => 'in review' },
+};
+
+function VisitedChip({ row: { checkpoint, status } }: { row: Row }) {
+  const chip = CHIP[status as keyof typeof CHIP];
+  return (
+    <span className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${chip.style}`}>
+      {chip.icon}{checkpoint.checkpoint_name}<span className="font-normal tabular-nums opacity-80">· {chip.label(checkpoint)}</span>
+    </span>
   );
 }
 
