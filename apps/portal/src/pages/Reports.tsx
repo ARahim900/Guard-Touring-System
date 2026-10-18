@@ -13,21 +13,22 @@ import { unwrap } from '@/lib/useAsync';
 
 const PAGE_SIZE = 50;
 
-/** One-tap periods. A night belongs to the date its patrol started. */
+/** One-tap periods. A patrol belongs to the date it started. */
 function quickRanges(today = dayKey()) {
   const firstOfMonth = `${today.slice(0, 8)}01`;
   const endOfLastMonth = addDays(firstOfMonth, -1);
   return [
-    { label: 'Last night', from: addDays(today, -1), to: addDays(today, -1) },
-    { label: 'Last 7 nights', from: addDays(today, -7), to: addDays(today, -1) },
+    { label: 'Today', from: today, to: today },
+    { label: 'Yesterday', from: addDays(today, -1), to: addDays(today, -1) },
+    { label: 'Last 7 days', from: addDays(today, -6), to: today },
     { label: 'This month', from: firstOfMonth, to: today },
     { label: 'Last month', from: `${endOfLastMonth.slice(0, 8)}01`, to: endOfLastMonth },
   ];
 }
 
 export default function ReportsPage() {
-  const [from, setFrom] = useState(() => addDays(dayKey(), -1));
-  const [to, setTo] = useState(() => addDays(dayKey(), -1));
+  const [from, setFrom] = useState(() => dayKey());
+  const [to, setTo] = useState(() => dayKey());
   const [report, setReport] = useState<PatrolReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -51,7 +52,7 @@ export default function ReportsPage() {
     }
   }
 
-  // Opening Reports shows last night straight away; nothing needs to be saved.
+  // Opening Reports shows today's report straight away, built from every scan; nothing needs to be saved.
   useEffect(() => { void run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function pick(start: string, end: string) {
@@ -88,7 +89,7 @@ export default function ReportsPage() {
 
   return (
     <>
-      <PageHeader title="Patrol reports" subtitle="Every scan is kept permanently, so any period can be opened at any time. Visits after midnight stay with the date the patrol started." />
+      <PageHeader title="Patrol reports" subtitle="The daily report is built automatically from every scan, and every scan is kept permanently, so any period can be opened at any time. Visits after midnight stay with the date the patrol started." />
       <Card className="mb-[14px]">
         <div className="mb-3 flex flex-wrap gap-2">
           {quickRanges().map((r) => <Button key={r.label} size="sm" variant={from === r.from && to === r.to ? 'primary' : 'outline'} disabled={busy} onClick={() => pick(r.from, r.to)}>{r.label}</Button>)}
@@ -111,9 +112,9 @@ export default function ReportsPage() {
             <StatCard icon={ClipboardList} label="Unvisited after shift end" value={totals.unvisited} hint={`${totals.remaining} not yet visited in open shifts`} />
             <StatCard icon={FileDown} label="Missing attachments" value={totals.missingAttachments} hint="Evidence still awaiting upload or recovery" />
           </div>
-          <Card title="Nights" className="mb-[14px]">
-            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} nights need a supervisor's explanation: no patrol recorded, missed, or not every location verified.` : 'No nights need an explanation.'}</p>
-            <Table head={['Night of', 'Result', 'Verified / required', 'Guard on duty']}>
+          <Card title="Days" className="mb-[14px]">
+            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} days need a supervisor's explanation: no patrol recorded, missed, or not every location verified.` : 'No days need an explanation.'}</p>
+            <Table head={['Date', 'Result', 'Verified / required', 'Guard on duty']}>
               {nights.map((n) => (
                 <tr key={n.date}>
                   <Td>{n.date}</Td>

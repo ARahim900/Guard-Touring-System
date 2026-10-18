@@ -48,10 +48,17 @@ function RequireAccount() {
   return <Outlet />;
 }
 
+/** The portal frame. Security accounts get it too, limited to Dashboard and Reports (read only). */
+function PortalFrame() {
+  const { profile } = useAuth();
+  if (profile?.role === 'guard') return <Layout />;
+  return <AlarmProvider><Layout /></AlarmProvider>;
+}
+
 function RequireStaff() {
   const { profile } = useAuth();
   if (profile?.role === 'guard') return <Navigate to="/guard" replace />;
-  return <AlarmProvider><Outlet /></AlarmProvider>;
+  return <Outlet />;
 }
 
 const router = createBrowserRouter([
@@ -62,25 +69,25 @@ const router = createBrowserRouter([
     errorElement: <div className="mx-auto max-w-md space-y-4 p-6"><h1 className="text-xl">Please reload the app</h1><p>The app may have updated, or the connection was interrupted. Scans saved on this phone are kept.</p><button className="rounded-md bg-primary px-5 py-3 text-white" onClick={() => window.location.reload()}>Reload app</button></div>,
     children: [
       { path: 'guard', lazy: page(() => import('@/pages/GuardPatrol')) },
-      { element: <RequireStaff />, children: [
       {
-        element: <Layout />,
+        element: <PortalFrame />,
         children: [
           { index: true, lazy: page(() => import('@/pages/PatrolHome')) },
-          { path: 'live', lazy: page(() => import('@/pages/LiveMap')) },
-          { path: 'alarms', lazy: page(() => import('@/pages/Alarms')) },
-          { path: 'incidents', lazy: page(() => import('@/pages/Incidents')) },
-          { path: 'scans', lazy: page(() => import('@/pages/Scans')) },
-          { path: 'shifts', lazy: page(() => import('@/pages/Shifts')) },
-          { path: 'routes', lazy: page(() => import('@/pages/Routes')) },
-          { path: 'checkpoints', lazy: page(() => import('@/pages/Checkpoints')) },
-          { path: 'checkpoints/place', lazy: page(() => import('@/pages/PlaceLabels')) },
-          { path: 'guards', lazy: page(() => import('@/pages/Guards')) },
           { path: 'reports', lazy: page(() => import('@/pages/Reports')) },
+          { element: <RequireStaff />, children: [
+            { path: 'live', lazy: page(() => import('@/pages/LiveMap')) },
+            { path: 'alarms', lazy: page(() => import('@/pages/Alarms')) },
+            { path: 'incidents', lazy: page(() => import('@/pages/Incidents')) },
+            { path: 'scans', lazy: page(() => import('@/pages/Scans')) },
+            { path: 'shifts', lazy: page(() => import('@/pages/Shifts')) },
+            { path: 'routes', lazy: page(() => import('@/pages/Routes')) },
+            { path: 'checkpoints', lazy: page(() => import('@/pages/Checkpoints')) },
+            { path: 'checkpoints/place', lazy: page(() => import('@/pages/PlaceLabels')) },
+            { path: 'guards', lazy: page(() => import('@/pages/Guards')) },
+          ] },
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },
-      ] },
     ],
   },
 ]);

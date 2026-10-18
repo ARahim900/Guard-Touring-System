@@ -4,13 +4,14 @@ import { Button, ErrorNote, Field, Select } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 
-export function GuardShiftStart({ names, endTime, disabled, onStarted }: {
-  names: string[]; endTime: string | null; disabled: boolean; onStarted: () => Promise<void>;
+/** Starts a patrol now; it runs for 12 hours (patrols have no fixed hours). */
+export function GuardShiftStart({ names, disabled, onStarted, title = 'Ready for your patrol?' }: {
+  names: string[]; disabled: boolean; onStarted: () => Promise<void>; title?: string;
 }) {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const defaultEnd = endTime?.slice(0, 5) ?? new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(Date.now() + 12 * 3600000));
+  const defaultEnd = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(Date.now() + 12 * 3600000));
 
   async function begin() {
     if (!name) { setError('Choose your name to start.'); return; }
@@ -25,10 +26,10 @@ export function GuardShiftStart({ names, endTime, disabled, onStarted }: {
   }
 
   return <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
-    <h2 className="text-xl">Ready for your patrol?</h2>
+    <h2 className="text-xl">{title}</h2>
     <p className="text-sm text-muted-foreground">Choose your name, then scan the QR label at each location.</p>
     <Field label="Guard on duty"><Select className="min-h-12 text-base" value={name} onChange={(event) => setName(event.target.value)} disabled={saving}><option value="">Choose your name</option>{names.map((guard) => <option key={guard} value={guard}>{guard}</option>)}</Select></Field>
-    <div className="flex gap-3 rounded-xl bg-secondary-light p-4 text-primary"><Clock3 className="size-5 shrink-0" aria-hidden="true" /><div><p className="font-medium">No need to end the patrol</p><p className="mt-1 text-sm">It starts now and ends by itself at {defaultEnd}. Every scan records its time and GPS position.</p></div></div>
+    <div className="flex gap-3 rounded-xl bg-secondary-light p-4 text-primary"><Clock3 className="size-5 shrink-0" aria-hidden="true" /><div><p className="font-medium">Start any time · no need to end it</p><p className="mt-1 text-sm">It starts now and ends by itself 12 hours later, at {defaultEnd}. Once every location is verified you can start a new round. Every scan records its time and GPS position.</p></div></div>
     <ErrorNote message={error} />
     <Button className="min-h-14 w-full rounded-2xl text-lg font-semibold" icon={ScanLine} loading={saving} disabled={disabled || !name} onClick={() => void begin()}>Start scanning</Button>
   </section>;

@@ -114,6 +114,11 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
   return <AlarmContext.Provider value={value}>{children}</AlarmContext.Provider>;
 }
 
+/** Open-alarm count for the menu; null where there is no alarm feed (security accounts). */
+export function useOpenAlarmCount() {
+  return useContext(AlarmContext)?.openCount ?? null;
+}
+
 export function useAlarms() {
   const ctx = useContext(AlarmContext);
   if (!ctx) throw new Error('useAlarms must be used inside AlarmProvider');

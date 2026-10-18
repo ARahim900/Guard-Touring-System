@@ -12,11 +12,14 @@ import { Badge, Button, ErrorNote, Field, Select, Spinner, Textarea } from '@/co
 import { friendlyError } from '@/lib/errors';
 import { FLAG_LABELS, VALIDATION, guardName } from '@/lib/labels';
 import { MEDIA_BUCKET, supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 import { formatDateTime } from '@/lib/time';
 import type { Scan, ScanValidation } from '@/lib/types';
 import { unwrap, useAsync } from '@/lib/useAsync';
 
 export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: () => void }) {
+  // The security account reads the evidence; only staff can review it.
+  const canReview = useAuth().profile?.role !== 'guard';
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [verdict, setVerdict] = useState<ScanValidation>('valid');
   const [reviewNote, setReviewNote] = useState('');
@@ -139,7 +142,7 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
         ))}
       </div>
 
-      <div className="rounded-md border border-border p-3">
+      {!canReview ? (scan.review_note ? <p className="rounded-md border border-border p-3 text-sm"><span className="font-semibold">Supervisor note: </span>{scan.review_note}</p> : null) : <div className="rounded-md border border-border p-3">
         <p className="mb-2 text-sm font-semibold">Supervisor review</p>
         {scan.reviewed_at ? <p className="mb-2 text-xs text-muted-foreground">Last reviewed {formatDateTime(scan.reviewed_at)}</p> : null}
         <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
@@ -158,7 +161,7 @@ export function ScanDetail({ scanId, onChanged }: { scanId: string; onChanged?: 
         <div className="mt-2 flex justify-end">
           <Button size="sm" loading={saving} onClick={() => void saveReview()}>Save review</Button>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

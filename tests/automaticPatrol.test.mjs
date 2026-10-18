@@ -194,12 +194,32 @@ test('self-service rejects invalid times, unlisted names, staff, inactive guards
   await assert.rejects(db.query("select public.start_my_patrol('20:00','06:00','Sample guard')"),/permission denied/);
 });
 
-test('finished patrols cannot be reset through a second overlapping shift',async()=>{
+test('a new round never resets a finished patrol, even over the same hours',async()=>{
   await rosterOnly();
   const id=(await db.query("select public.start_my_patrol('20:00','06:00','Sample guard') as id")).rows[0].id;
   await db.query('select public.end_shift($1)',[id]);
-  await assert.rejects(db.query("select public.start_my_patrol('21:00','07:00','Sample guard')"),/overlap a finished/);
-  assert.equal((await db.query('select count(*)::int as n from public.shifts')).rows[0].n,1);
+  const next=(await db.query("select public.start_my_patrol('21:00','07:00','Sample guard') as id")).rows[0].id;
+  assert.notEqual(next,id);
+  const finished=(await db.query('select status,actual_end from public.shifts where id=$1',[id])).rows[0];
+  assert.equal(finished.status,'completed');
+  assert.ok(finished.actual_end);
+  assert.equal((await db.query('select count(*)::int as n from public.shifts')).rows[0].n,2);
+});
+
+test('a fully verified round is closed when the next round starts; an open round resumes',async()=>{
+  await rosterOnly();
+  const id=(await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id;
+  assert.equal((await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id,id);
+  await assert.rejects(db.query("select public.start_patrol_now('Sample two')"),/already in progress/);
+  await db.query("select public.submit_scan($1,$2,$3,'qr','TEST-LOCATION','normal',null,public.test_now(),public.test_now(),0,0,5,false,0)",[randomUUID(),id,checkpoint]);
+  assert.equal((await db.query('select bool_and(completed) as done from public.shift_checkpoint_status where shift_id=$1',[id])).rows[0].done,true);
+  const next=(await db.query("select public.start_patrol_now('Sample two') as id")).rows[0].id;
+  assert.notEqual(next,id);
+  const finished=(await db.query('select status,actual_end from public.shifts where id=$1',[id])).rows[0];
+  assert.equal(finished.status,'completed');
+  assert.ok(finished.actual_end);
+  const started=(await db.query('select status,on_duty_name from public.shifts where id=$1',[next])).rows[0];
+  assert.deepEqual([started.status,started.on_duty_name],['active','Sample two']);
 });
 
 test('self-service reuses an unstarted automatic shift and remains isolated from another login',async()=>{
@@ -226,12 +246,12 @@ test('start now uses the server time, defaults to twelve hours and safely resume
   assert.equal((await db.query('select count(*)::int as n from public.shifts')).rows[0].n,1);
 });
 
-test('start now honours a configured end and a guard-selected end across midnight',async()=>{
+test('start now ignores old fixed hours, lasts twelve hours, and honours a guard-selected end across midnight',async()=>{
   await setup();await asUser(guard);
   const id=(await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id;
   const row=(await db.query('select scheduled_start,scheduled_end from public.shifts where id=$1',[id])).rows[0];
   assert.equal(new Date(row.scheduled_start).toISOString(),'2026-12-31T18:00:00.000Z');
-  assert.equal(new Date(row.scheduled_end).toISOString(),'2027-01-01T02:00:00.000Z');
+  assert.equal(new Date(row.scheduled_end).toISOString(),'2027-01-01T06:00:00.000Z');
   await asUser(other);
   const otherId=(await db.query("select public.start_patrol_now('Sample two','05:30') as id")).rows[0].id;
   const otherRow=(await db.query('select scheduled_end from public.shifts where id=$1',[otherId])).rows[0];
