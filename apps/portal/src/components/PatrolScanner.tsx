@@ -4,10 +4,12 @@ import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 
-export function PatrolScanner({ onScan, onClose, fullscreen = false }: {
+export function PatrolScanner({ onScan, onClose, fullscreen = false, target }: {
   onScan: (code: string, method: 'qr' | 'barcode') => void;
   onClose: () => void;
   fullscreen?: boolean;
+  /** Name of the location the guard tapped, shown above the camera. */
+  target?: string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const onScanRef = useRef(onScan);
@@ -63,7 +65,10 @@ export function PatrolScanner({ onScan, onClose, fullscreen = false }: {
     // Guard patrol: the camera fills the screen so there is nothing else to look for.
     <section role="dialog" aria-modal="true" aria-label="Camera scanner" className="fixed inset-0 z-50 flex flex-col bg-black text-white">
       <header className="flex items-center justify-between gap-3 px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-3">
-        <h2 className="text-lg text-white">Scan the location's QR label</h2>
+        <div className="min-w-0">
+          <p className="text-sm text-white/70">{target ? 'Scan the QR label at' : 'Scan the location’s QR label'}</p>
+          {target ? <h2 className="truncate text-xl text-white">{target}</h2> : null}
+        </div>
         <button ref={closeButton} type="button" onClick={onClose} aria-label="Close camera" className="flex size-12 items-center justify-center rounded-full bg-white/15"><X className="size-6" aria-hidden="true" /></button>
       </header>
       <div className="relative min-h-0 flex-1">
