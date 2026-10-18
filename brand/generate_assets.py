@@ -33,9 +33,9 @@ PURPLE = (110, 105, 127)  # #6E697F
 TEAL = (174, 223, 226)    # #AEDFE2
 WHITE = (255, 255, 255)
 
-# App icons use the brand framework colours: the mark reversed out of Deep
-# Purple, with Sage Teal bars and white stripes (same treatment as the portal
-# navbar). The official logo files keep the colours sampled above.
+# App icons use the official logo colours (chosen by the owner, Oct 2026): the
+# mark reversed out of the logo purple, with logo-teal bars and white stripes.
+# BRAND_* are the brand framework tones still used inside the portal UI.
 BRAND_PURPLE = (78, 68, 86)    # #4E4456
 BRAND_TEAL = (164, 197, 187)   # #A4C5BB
 
@@ -140,11 +140,11 @@ def main():
     portal = ROOT / "apps" / "portal" / "public"
 
     # Icons use the mark only: the wordmark is unreadable at icon size.
-    reversed_mark = lambda size: draw_mark(size, BRAND_TEAL, WHITE)
+    reversed_mark = lambda size: draw_mark(size, TEAL, WHITE)
     # iOS / store icon: no transparency allowed -> Deep Purple background.
-    on_canvas(reversed_mark(1024), 1024, 0.6, BRAND_PURPLE).convert("RGB").save(guard / "icon.png")
+    on_canvas(reversed_mark(1024), 1024, 0.6, PURPLE).convert("RGB").save(guard / "icon.png")
     # Android adaptive icon foreground: transparent, inside the 66% safe circle.
-    # Its Deep Purple background is set in app.config.ts (adaptiveIcon.backgroundColor).
+    # Its logo-purple background is set in app.config.ts (adaptiveIcon.backgroundColor).
     on_canvas(reversed_mark(1024), 1024, 0.46).save(guard / "adaptive-icon.png")
 
     logo = full_logo(1200, source)
@@ -153,16 +153,16 @@ def main():
     logo.resize((800, round(logo.height * 800 / logo.width)), Image.LANCZOS).save(guard / "logo.png")
 
     # Portal
-    on_canvas(reversed_mark(64), 64, 0.72, BRAND_PURPLE).save(portal / "favicon.png")
-    on_canvas(reversed_mark(180), 180, 0.6, BRAND_PURPLE).convert("RGB").save(portal / "apple-touch-icon.png")
+    on_canvas(reversed_mark(64), 64, 0.72, PURPLE).save(portal / "favicon.png")
+    on_canvas(reversed_mark(180), 180, 0.6, PURPLE).convert("RGB").save(portal / "apple-touch-icon.png")
     # Installed web app (PWA) icon; 0.6 keeps the mark inside the maskable safe zone.
-    on_canvas(reversed_mark(1024), 1024, 0.6, BRAND_PURPLE).convert("RGB").save(portal / "patrol-icon.png")
+    on_canvas(reversed_mark(1024), 1024, 0.6, PURPLE).convert("RGB").save(portal / "patrol-icon.png")
     logo.resize((800, round(logo.height * 800 / logo.width)), Image.LANCZOS).save(portal / "muscat-bay-logo.png")
     draw_mark(256).save(portal / "muscat-bay-mark.png")
 
     # Preview sheet for a quick visual check (not used by the apps).
     # Each tile is shown on the background the phone will use behind it.
-    tiles = [("icon.png", guard / "icon.png", WHITE), ("adaptive-icon.png", guard / "adaptive-icon.png", BRAND_PURPLE), ("splash-icon.png", guard / "splash-icon.png", WHITE)]
+    tiles = [("icon.png", guard / "icon.png", WHITE), ("adaptive-icon.png", guard / "adaptive-icon.png", PURPLE), ("splash-icon.png", guard / "splash-icon.png", WHITE)]
     sheet = Image.new("RGB", (1024 * 3 + 80, 1104), (230, 230, 230))
     d = ImageDraw.Draw(sheet)
     for i, (name, path, tile_bg) in enumerate(tiles):

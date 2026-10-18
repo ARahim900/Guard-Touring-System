@@ -1,8 +1,8 @@
 # MB Security: supervisor iPhone app
 
 A small native iPhone app (Swift, Apple's WebKit) that shows the live
-supervisor portal (`https://securitymbpatrolling.netlify.app`) full-screen.
-The portal itself is the app, so every Netlify deploy of `main` reaches the
+supervisor portal (`https://securitymb.vercel.app`) full-screen.
+The portal itself is the app, so every Vercel deploy of the portal reaches the
 phone with no new build. Installed size is under 1 MB; the earlier React
 Native version was about 26 MB.
 

@@ -4,15 +4,15 @@ import WebKit
 
 /// MB Security — iPhone shell around the live supervisor portal.
 ///
-/// The app IS the website: it loads the Netlify portal full-screen, so every
+/// The app IS the website: it loads the Vercel portal full-screen, so every
 /// deploy of `main` reaches the phone with no rebuild. The portal does not paint
 /// under the notch, so the shell fills the top inset with the purple top-bar
 /// colour and the bottom inset with the bottom-bar white (purple on sign-in).
 final class PortalViewController: UIViewController {
     private enum Config {
-        static let appURL = URL(string: "https://securitymbpatrolling.netlify.app")!
+        static let appURL = URL(string: "https://securitymb.vercel.app")!
         /// Hosts that stay inside the app. The Supabase host serves password-reset hops.
-        static let inAppHosts: Set<String> = ["securitymbpatrolling.netlify.app", "zdezuylsruzbddqcdhog.supabase.co"]
+        static let inAppHosts: Set<String> = ["securitymb.vercel.app", "zdezuylsruzbddqcdhog.supabase.co"]
         static let downloadHandler = "mbDownload"
         static let splashTimeout: TimeInterval = 10
     }
