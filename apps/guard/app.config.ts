@@ -82,7 +82,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     versionCode: 1,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#4E4456',
+      backgroundColor: '#6E697F',
     },
     permissions: [
       'android.permission.CAMERA',
