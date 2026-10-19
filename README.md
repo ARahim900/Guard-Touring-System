@@ -47,7 +47,8 @@ Patrolling_Tour_System/
     │       ├── components/       ← UI building blocks, SOS button, voice recorder
     │       └── lib/              ← Supabase client, brand theme, helpers
     └── portal/                   ← supervisor website
-        ├── netlify.toml          ← build + security headers
+        ├── vercel.json           ← build + security headers (live at securitymb.vercel.app)
+        ├── netlify.toml          ← old Netlify address: forwards to Vercel
         └── src/
             ├── pages/            ← Dashboard, Live map, Alarms, Incidents, Scans,
             │                       Schedules, Routes, Checkpoints, Guards, Reports

@@ -1,34 +1,17 @@
-# Netlify build settings for the Supervisor Portal.
-# In Netlify set "Base directory" to apps/portal (or keep this file there).
+# The portal now lives at https://securitymb.vercel.app (deployed by Vercel from
+# this repository). The old Netlify address only forwards visitors there.
+#
+# netlify-forward/ holds one file, sw.js, which retires the old offline copy on
+# phones that installed the Netlify site. Every other address is redirected
+# permanently, keeping the page path (for example /reports).
 [build]
-  command = "npm run build"
-  publish = "dist"
+  command = "echo Forwarding to securitymb.vercel.app"
+  publish = "netlify-forward"
 
-[build.environment]
-  NODE_VERSION = "22"
-
-# Single-page app: every URL serves index.html; React Router picks the page.
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
-
-# Security headers. The CSP allows only our own code, Supabase, Sentry and the
-# OpenStreetMap and Esri imagery tiles used by the maps.
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(self), microphone=(), geolocation=(self)"
-    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://*.supabase.co; media-src 'self' blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io; frame-ancestors 'none'"
-
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+  to = "https://securitymb.vercel.app/:splat"
+  status = 301
 
 [[headers]]
   for = "/sw.js"
