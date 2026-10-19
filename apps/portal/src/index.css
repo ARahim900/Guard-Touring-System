@@ -61,6 +61,12 @@
   #root {
     height: 100%;
   }
+  /* The page never scrolls sideways or opens wider than the phone; wide
+     content (tables) scrolls inside its own box. */
+  html,
+  body {
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-size: 14px;

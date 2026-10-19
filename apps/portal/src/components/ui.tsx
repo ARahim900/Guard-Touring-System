@@ -77,8 +77,10 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: Tone 
 }
 
 // --------------------------------------------------------------- Form fields
+// 16px text on phones: iPhones zoom in on any smaller input when it is tapped
+// (e.g. the sign-in email) and stay zoomed after sign-in. 14px from 640px up.
 const inputCls =
-  'h-10 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-secondary';
+  'h-11 w-full rounded-md border border-border bg-card px-3 text-base text-foreground placeholder:text-muted-foreground focus:border-secondary sm:h-10 sm:text-sm';
 
 export function Field({ label, hint, error, children, className }: { label: string; hint?: string; error?: string | null; children: ReactNode; className?: string }) {
   return (
