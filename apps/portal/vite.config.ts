@@ -7,7 +7,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), VitePWA({
-    registerType: 'prompt',
+    // Updates install by themselves: the new version loads the next time the app
+    // opens. With 'prompt' and no prompt on screen, phones kept the old version.
+    registerType: 'autoUpdate',
     injectRegister: 'script-defer',
     manifest: {
       id: '/', name: 'Muscat Bay Security', short_name: 'MB Security',
@@ -23,6 +25,9 @@ export default defineConfig({
     workbox: {
       globPatterns: ['**/*.{js,css,html,png,woff2}'],
       navigateFallback: '/index.html',
+      // The new version takes over open pages too, instead of waiting for them to close.
+      clientsClaim: true,
+      skipWaiting: true,
       // Cache app files only. Authenticated API responses never enter the service worker cache.
       runtimeCaching: [],
     },
