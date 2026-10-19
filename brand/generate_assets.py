@@ -30,6 +30,7 @@ SRC = ROOT / "brand" / "muscat_bay.png"
 # The web app's own Home Screen icon (security shield with route), chosen by the
 # owner: what Safari or Chrome saves when the portal is added to the Home Screen.
 WEB_ICON = ROOT / "brand" / "web-app-icon.png"
+WHITE_WEB_ICON = ROOT / "brand" / "web-app-icon-white.png"
 
 # Exact colours sampled from the supplied logo.
 PURPLE = (110, 105, 127)  # #6E697F
@@ -148,8 +149,7 @@ def main():
     # the phone rounds its corners. No transparency (iOS would add black).
     full_icon = lambda size: on_canvas(reversed_mark(size), size, 1.0, PURPLE).convert("RGB")
     full_icon(1024).save(guard / "icon.png")
-    # The supervisor iPhone app (TestFlight) uses the same shield as the web app,
-    # so the icon is the same however the app was installed.
+    # Preserve the existing artwork for the separately distributed native app.
     Image.open(WEB_ICON).convert("RGB").resize((1024, 1024), Image.LANCZOS).save(
         ROOT / "apps" / "portal-ios" / "ios" / "MBPatrol" / "Assets.xcassets" / "AppIcon.appiconset" / "icon.png")
     # Android adaptive icon foreground: transparent, inside the 66% safe circle.
@@ -162,21 +162,22 @@ def main():
     logo.resize((800, round(logo.height * 800 / logo.width)), Image.LANCZOS).save(guard / "logo.png")
 
     # Portal
-    # Web app icons come from WEB_ICON, a full-bleed square on its own purple.
-    web = Image.open(WEB_ICON).convert("RGB")
+    # The active web portal uses a white tile with a purple security shield.
+    # Distinct filenames let installed apps detect the updated artwork.
+    web = Image.open(WHITE_WEB_ICON).convert("RGB")
     web_bg = web.getpixel((4, 4))
     web_icon = lambda size: web.resize((size, size), Image.LANCZOS)
     web_icon(64).save(portal / "favicon.png")
     web_icon(48).save(portal / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
     # iPhone "Add to Home Screen". Some iOS versions ask for the -precomposed
     # name first; without the file the site's page came back instead of a picture.
-    web_icon(180).save(portal / "apple-touch-icon.png")
+    web_icon(180).save(portal / "apple-touch-icon-white.png")
     web_icon(180).save(portal / "apple-touch-icon-precomposed.png")
     # Installed web app (PWA) icons, listed in vite.config.ts.
-    web_icon(192).save(portal / "pwa-192.png")
-    web_icon(512).save(portal / "pwa-512.png")
+    web_icon(192).save(portal / "pwa-192-white.png")
+    web_icon(512).save(portal / "pwa-512-white.png")
     # Android crops "maskable" icons to a circle: shrink the shield into the safe zone.
-    on_canvas(web.convert("RGBA"), 512, 0.8, web_bg).convert("RGB").save(portal / "pwa-maskable-512.png")
+    on_canvas(web.convert("RGBA"), 512, 0.8, web_bg).convert("RGB").save(portal / "pwa-maskable-512-white.png")
     logo.resize((800, round(logo.height * 800 / logo.width)), Image.LANCZOS).save(portal / "muscat-bay-logo.png")
     draw_mark(256).save(portal / "muscat-bay-mark.png")
 

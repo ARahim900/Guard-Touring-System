@@ -150,20 +150,20 @@ export default function ReportsPage() {
       <PageHeader title="Patrol reports" subtitle="The daily report is built automatically from every scan, and every scan is kept permanently, so any period can be opened at any time. Visits after midnight stay with the date the patrol started." />
       <div ref={periodCard} className="scroll-mt-32" />
       <Card title="Reporting period" className="mb-[14px]">
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div role="group" aria-label="Quick reporting periods" className="mb-4 flex gap-2 overflow-x-auto pb-2 [&>button]:min-h-11 [&>button]:shrink-0 [&>button]:whitespace-nowrap">
           {quickRanges().map((r) => <Button key={r.label} size="sm" variant={from === r.from && to === r.to ? 'primary' : 'outline'} disabled={busy || exporting} onClick={() => pick(r.from, r.to)}>{r.label}</Button>)}
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="From date"><Input type="date" disabled={busy || exporting} value={from} onChange={(e) => { setFrom(e.target.value); setReport(null); }} /></Field>
-          <Field label="To date"><Input type="date" disabled={busy || exporting} value={to} min={from} onChange={(e) => { setTo(e.target.value); setReport(null); }} /></Field>
-          <Button icon={Play} loading={busy} disabled={exporting} onClick={() => { setView('summary'); void run(); }}>Generate report</Button>
-          <Button variant="secondary" icon={FileDown} disabled={!report || exporting} onClick={() => void download('pdf')}>PDF</Button>
-          <Button variant="outline" icon={FileDown} disabled={!report || exporting} onClick={() => void download('csv')}>Excel / CSV</Button>
+        <div className="grid min-w-0 grid-cols-2 items-end gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto]">
+          <Field label="From date" className="min-w-0"><Input className="min-w-0 max-w-full" type="date" disabled={busy || exporting} value={from} onChange={(e) => { setFrom(e.target.value); setReport(null); }} /></Field>
+          <Field label="To date" className="min-w-0"><Input className="min-w-0 max-w-full" type="date" disabled={busy || exporting} value={to} min={from} onChange={(e) => { setTo(e.target.value); setReport(null); }} /></Field>
+          <Button className="col-span-2 min-h-11 whitespace-nowrap lg:col-span-1" icon={Play} loading={busy} disabled={exporting} onClick={() => { setView('summary'); void run(); }}>Generate report</Button>
+          <Button className="min-h-11 whitespace-nowrap" variant="secondary" icon={FileDown} disabled={!report || exporting} onClick={() => void download('pdf')}>PDF</Button>
+          <Button className="min-h-11 whitespace-nowrap" variant="outline" icon={FileDown} disabled={!report || exporting} onClick={() => void download('csv')}>Excel / CSV</Button>
         </div>
         <ErrorNote message={error} />
       </Card>
-      <nav aria-label="Report views" className="mb-4 flex flex-wrap gap-2">
-        {([{ key: 'summary', label: 'Summary' }, { key: 'evidence', label: 'Location evidence' }, { key: 'archive', label: 'Daily archive' }] as const).map(({ key, label }) => <Button key={key} variant={view === key ? 'primary' : 'outline'} aria-pressed={view === key} onClick={() => setView(key)}>{label}</Button>)}
+      <nav aria-label="Report views" className="mb-4 grid grid-cols-3 gap-2 sm:flex [&>button]:min-h-11 [&>button]:px-2 [&>button]:whitespace-nowrap sm:[&>button]:px-4">
+        {([{ key: 'summary', label: 'Summary' }, { key: 'evidence', label: 'Location evidence' }, { key: 'archive', label: 'Daily archive' }] as const).map(({ key, label }) => <Button key={key} variant={view === key ? 'primary' : 'outline'} aria-label={label} aria-pressed={view === key} onClick={() => setView(key)}><span className="sm:hidden">{key === 'evidence' ? 'Evidence' : key === 'archive' ? 'Archive' : label}</span><span className="hidden sm:inline">{label}</span></Button>)}
       </nav>
       {view === 'archive' ? <DailyReports onView={(date) => { pick(date, date); periodCard.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} /> : null}
       {view !== 'archive' && busy ? <Spinner label="Loading report…" /> : null}

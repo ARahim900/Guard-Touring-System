@@ -1,8 +1,8 @@
 // =============================================================================
 // Reusable UI pieces styled with the Muscat Bay tokens (see index.css).
 // =============================================================================
-import { Loader2, X } from 'lucide-react';
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { ArrowLeft, ArrowRight, Loader2, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 import type { Tone } from '@/lib/labels';
 
@@ -51,7 +51,7 @@ export function Button({
 // ---------------------------------------------------------------------- Card
 export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: string; action?: ReactNode }) {
   return (
-    <section className={cx('rounded-lg border border-border bg-card shadow-card', className)}>
+    <section className={cx('min-w-0 rounded-lg border border-border bg-card shadow-card', className)}>
       {title ? (
         <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
           <h2 className="text-base">{title}</h2>
@@ -224,24 +224,53 @@ export function StatCard({ label, value, hint, icon: I, tone = 'brand' }: { labe
 
 // -------------------------------------------------------------------- Table
 export function Table({ head, children, label = 'Scrollable data table' }: { head: string[]; children: ReactNode; label?: string }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const hintId = useId();
+  const [edges, setEdges] = useState({ left: false, right: false });
+  function updateEdges() {
+    const el = scrollRef.current;
+    if (el) {
+      const left = el.scrollLeft > 1, right = el.scrollWidth - el.clientWidth - el.scrollLeft > 1;
+      setEdges((previous) => previous.left === left && previous.right === right ? previous : { left, right });
+    }
+  }
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(updateEdges);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    updateEdges();
+    return () => observer.disconnect();
+  }, []);
+  const overflowing = edges.left || edges.right;
   return (
-    <div className="overflow-x-auto rounded-sm" tabIndex={0} role="region" aria-label={label}>
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-border text-xs text-muted-foreground uppercase">
-          <tr>
-            {head.map((h, index) => (
-              <th key={`${h}-${index}`} scope="col" className="px-3 py-2 font-semibold whitespace-nowrap">
-                {h || <span className="sr-only">Actions</span>}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">{children}</tbody>
-      </table>
+    <div className="min-w-0 max-w-full">
+      {overflowing ? <div className="mb-2 flex items-center justify-between gap-2">
+        <p id={hintId} className="text-sm text-muted-foreground">Swipe or use arrows to see all columns.</p>
+        <div className="flex shrink-0 gap-1">
+          <Button type="button" variant="outline" className="min-h-11 w-11 px-0" aria-label={`Scroll ${label} left`} disabled={!edges.left} onClick={() => scrollRef.current?.scrollBy({ left: -240, behavior: 'auto' })}><ArrowLeft className="size-4" aria-hidden="true" /></Button>
+          <Button type="button" variant="outline" className="min-h-11 w-11 px-0" aria-label={`Scroll ${label} right`} disabled={!edges.right} onClick={() => scrollRef.current?.scrollBy({ left: 240, behavior: 'auto' })}><ArrowRight className="size-4" aria-hidden="true" /></Button>
+        </div>
+      </div> : null}
+      <div ref={scrollRef} onScroll={updateEdges} className="max-w-full overflow-x-auto overscroll-x-contain rounded-sm" tabIndex={0} role="region" aria-label={label} aria-describedby={overflowing ? hintId : undefined}>
+        <table className="w-full min-w-[40rem] text-left text-sm leading-5">
+          <thead className="border-b border-border text-xs text-muted-foreground uppercase">
+            <tr>
+              {head.map((h, index) => (
+                <th key={`${h}-${index}`} scope="col" className="px-3 py-2 font-semibold whitespace-nowrap">
+                  {h || <span className="sr-only">Actions</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">{children}</tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 export const Td = ({ children, className }: { children?: ReactNode; className?: string }) => (
-  <td className={cx('px-3 py-2.5 align-top', className)}>{children}</td>
+  <td className={cx('max-w-sm px-3 py-3 align-top break-words', className)}>{children}</td>
 );

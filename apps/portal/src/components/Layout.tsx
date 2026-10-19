@@ -3,10 +3,11 @@
 // on desktop, and a bottom bar on phones and tablets (no sideways scrolling).
 // The bars sit at z-40, below dialogs (z-50); Leaflet is isolated in index.css.
 // =============================================================================
-import { Bell, ChevronDown, FileText, LayoutDashboard, LogOut, Map as MapIcon, MapPin, Menu, Moon, ScanLine, TriangleAlert, X, type LucideIcon } from 'lucide-react';
+import { Bell, ChevronDown, FileText, LogOut, Map as MapIcon, MapPin, Menu, Moon, ScanLine, TriangleAlert, X, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 
+import { GuardNavigation, guardPages } from '@/components/GuardNavigation';
 import { BrandMark } from '@/components/BrandMark';
 import { useOpenAlarmCount } from '@/context/AlarmContext';
 import { useAuth } from '@/context/AuthContext';
@@ -31,12 +32,6 @@ const pages: NavPage[] = [
 ];
 const barPages = pages.filter((page) => page.short);
 const morePages = pages.filter((page) => !page.short);
-/** Security accounts: scanning plus read-only Dashboard and Reports. */
-const guardPages: NavPage[] = [
-  { to: '/guard', label: 'Scan', short: 'Scan', icon: ScanLine },
-  { to: '/', label: 'Dashboard', short: 'Dashboard', icon: LayoutDashboard },
-  { to: '/reports', label: 'Reports', short: 'Reports', icon: FileText },
-];
 
 const ROLE_LABEL: Record<UserRole, string> = { admin: 'Admin', supervisor: 'Supervisor', guard: 'Guard' };
 
@@ -237,11 +232,11 @@ export function Layout() {
         </nav>
       </div>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-6 lg:pb-6"><Outlet /></main>
+      <main className="mx-auto min-w-0 w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-6 lg:pb-6"><Outlet /></main>
 
-      <nav aria-label="Main navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
-        <ul className={`grid ${guard ? 'grid-cols-3' : 'grid-cols-5'}`}>
-          {(guard ? guardPages : barPages).map(({ to, short, icon: Icon }) => (
+      {guard ? <GuardNavigation /> : <nav aria-label="Main navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <ul className="grid grid-cols-5">
+          {barPages.map(({ to, short, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}
@@ -261,7 +256,7 @@ export function Layout() {
               </NavLink>
             </li>
           ))}
-          {guard ? null : <li>
+          <li>
             <button
               ref={moreButtonRef}
               type="button"
@@ -273,9 +268,9 @@ export function Layout() {
               {moreActive ? <span aria-hidden="true" className="absolute inset-x-3 top-0 h-[3px] rounded-b-sm bg-secondary" /> : null}
               <Menu aria-hidden="true" className="size-5" />More
             </button>
-          </li>}
+          </li>
         </ul>
-      </nav>
+      </nav>}
       <MoreSheet open={moreOpen} onClose={closeMore} returnFocusRef={moreButtonRef} />
     </div>
   );

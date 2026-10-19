@@ -12,6 +12,7 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
+import { GuardNavigation } from '@/components/GuardNavigation';
 import { BrandMark } from '@/components/BrandMark';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
 import { InstallPatrol } from '@/components/InstallPatrol';
@@ -131,7 +132,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
     } catch (cause) { setActionError(friendlyError(cause)); }
   }
 
-  if (loading) return <Spinner label="Loading your patrol…" />;
+  if (loading) return <><Spinner label="Loading your patrol…" /><GuardNavigation /></>;
   return (
     <>
       <header inert={overlay} className="sticky top-0 z-30 bg-primary px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-4 text-white shadow-card">
@@ -160,7 +161,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         </div>
       </header>
 
-      <main inert={overlay} className={`mx-auto max-w-xl space-y-5 px-4 pt-4 ${active ? 'pb-36' : 'pb-10'}`}>
+      <main inert={overlay} className={`mx-auto max-w-xl space-y-5 px-4 pt-4 ${active ? 'pb-[calc(13rem+env(safe-area-inset-bottom))] lg:pb-36' : 'pb-28 lg:pb-10'}`}>
         <ErrorNote message={actionError ?? error} />
         {cached ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">Showing the patrol saved on this phone. It could not be updated just now.</p> : null}
         {pending.length ? (
@@ -224,7 +225,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
       </main>
 
       {active ? (
-        <div inert={overlay} className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+        <div inert={overlay} className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card px-4 py-3 lg:bottom-0 lg:pb-[calc(12px+env(safe-area-inset-bottom))]">
           <div className="mx-auto max-w-xl">
             <button ref={scanButton} type="button" onClick={() => openScanner()} disabled={!canScan || scanning !== false || shown?.kind === 'checking'} className="flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-lg font-semibold text-white shadow-card active:bg-primary-hover disabled:opacity-50">
               <ScanLine className="size-6" aria-hidden="true" />Scan location
@@ -233,6 +234,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         </div>
       ) : null}
 
+      <GuardNavigation inert={overlay} />
       {scanning !== false && active ? <PatrolScanner fullscreen target={scanning ?? undefined} onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
       {shown ? <ScanConfirm state={shown} done={verified} total={checkpoints.length} canScan={canScan} busy={syncing}
         onClose={() => setConfirm(null)} onScan={() => openScanner()} onRetryUpload={() => void refresh(true)} /> : null}
