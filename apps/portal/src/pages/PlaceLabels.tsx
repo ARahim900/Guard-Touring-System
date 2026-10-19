@@ -42,7 +42,8 @@ export default function PlaceLabelsPage() {
   const list = useAsync(async () => unwrap(await supabase.from('checkpoints')
     .select('id, name, code, nfc_uid, description, latitude, longitude, radius_m, active, placed_at').order('name')) as Checkpoint[], []);
   const [mode, setMode] = useState<'map' | 'scan'>('map');
-  const all = list.data ?? [];
+  // Deleted locations (kept only for past reports) are never offered for placing.
+  const all = (list.data ?? []).filter((c) => c.active || !c.placed_at);
   const remaining = all.filter((c) => !c.placed_at);
 
   return (
