@@ -1,18 +1,27 @@
-import { CheckCircle2, ClipboardList, FileDown, Play, RefreshCw, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Clock, FileDown, Play, RefreshCw, ShieldAlert, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ScanDetail } from '@/components/ScanDetail';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Spinner, StatCard, Table, Td } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
-import { NIGHTS_NEEDING_ATTENTION, buildReportCsv, coordinates, evidenceTime, nightRows, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
-import { buildReportPdf } from '@/lib/reportPdf';
+import type { Tone } from '@/lib/labels';
+import { NIGHTS_NEEDING_ATTENTION, accuracy, buildReportCsv, coordinates, evidenceTime, guardOnDuty, nightRows, patrolEnd, patrolResult, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
+import { buildReportPdf, loadReportLogo } from '@/lib/reportPdf';
 import { supabase } from '@/lib/supabase';
 import { addDays, dayKey, formatDay } from '@/lib/time';
 import { unwrap, useAsync } from '@/lib/useAsync';
 
 const PAGE_SIZE = 50;
 const DAILY_DAYS = 14;
+
+/** Badge colour for a day, patrol or location result. */
+function resultTone(result: string): Tone {
+  if (result === 'Completed' || result === 'Verified') return 'success';
+  if (['Missed', 'Rejected', 'Absent', 'Incomplete'].includes(result)) return 'danger';
+  if (['Pending', 'Awaiting review', 'In progress', 'Not started'].includes(result)) return 'warning';
+  return 'neutral';
+}
 
 /** One ready-made report per day, built automatically from the scans: nothing to generate. */
 function DailyReports({ onView }: { onView: (date: string) => void }) {
@@ -21,10 +30,10 @@ function DailyReports({ onView }: { onView: (date: string) => void }) {
     unwrap(await supabase.rpc('patrol_report', { p_from: addDays(today, -(DAILY_DAYS - 1)), p_to: today, p_contractor_id: null })) as PatrolReport, [today]);
   const days = data ? nightRows(data).reverse() : [];
 
-  function pdf(date: string) {
+  async function pdf(date: string) {
     if (!data) return;
     try {
-      buildReportPdf({ ...data, from_date: date, to_date: date, shifts: data.shifts.filter((s) => s.patrol_date === date) }).save(`MB_Patrol_${date}.pdf`);
+      buildReportPdf({ ...data, from_date: date, to_date: date, shifts: data.shifts.filter((s) => s.patrol_date === date) }, await loadReportLogo()).save(`MB_Patrol_${date}.pdf`);
     } catch (e) {
       toast.error(friendlyError(e, 'Could not create the PDF.'));
     }
@@ -41,14 +50,14 @@ function DailyReports({ onView }: { onView: (date: string) => void }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3 sm:justify-start">
                   <p className="font-semibold">{d.date === today ? 'Today' : formatDay(`${d.date}T12:00:00+04:00`)}</p>
-                  <Badge label={d.status} tone={d.status === 'Completed' ? 'brand' : NIGHTS_NEEDING_ATTENTION.includes(d.status) ? 'warning' : 'neutral'} />
+                  <Badge label={d.status} tone={resultTone(d.status)} />
                 </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">{d.required ? `${d.verified} of ${d.required} locations verified` : 'No scans on this day'}{d.guards.length ? ` · ${d.guards.join(', ')}` : ''}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{d.required ? `${d.verified} of ${d.required} locations verified` : d.status === 'Absent' ? 'No patrol was carried out' : 'No scans on this day'}{d.guards.length ? ` · ${d.guards.join(', ')}` : ''}</p>
               </div>
               {d.required ? (
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-0 sm:flex">
                   <Button size="sm" variant="outline" onClick={() => onView(d.date)}>View</Button>
-                  <Button size="sm" variant="secondary" icon={FileDown} onClick={() => pdf(d.date)}>PDF</Button>
+                  <Button size="sm" variant="secondary" icon={FileDown} onClick={() => void pdf(d.date)}>PDF</Button>
                 </div>
               ) : null}
             </li>
@@ -112,7 +121,7 @@ export default function ReportsPage() {
     setExporting(true);
     try {
       const filename = `MB_Patrol_${report.from_date}_${report.to_date}`;
-      if (format === 'pdf') buildReportPdf(report).save(`${filename}.pdf`);
+      if (format === 'pdf') buildReportPdf(report, await loadReportLogo()).save(`${filename}.pdf`);
       else {
         const url = URL.createObjectURL(new Blob([buildReportCsv(report)], { type: 'text/csv;charset=utf-8;' }));
         const anchor = document.createElement('a');
@@ -154,47 +163,47 @@ export default function ReportsPage() {
       </Card>
       {report && totals ? (
         <>
-          <p className="mb-4 text-sm text-muted-foreground">Generated {evidenceTime(report.generated_at)} · Muscat time. Only received records are shown; phone uploads may still be pending. Cancelled shifts are excluded from totals.</p>
+          <p className="mb-4 text-sm text-muted-foreground">Generated {evidenceTime(report.generated_at)} · Muscat time. Only scans received from the phones are shown. Cancelled patrols are left out of the totals.</p>
           <div className="mb-[14px] grid gap-[14px] sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard icon={CheckCircle2} label="Verified / required" value={`${totals.verified} / ${totals.required}`} hint={totals.completion === null ? 'No required locations' : `${totals.completion.toFixed(1)}% verified`} />
-            <StatCard icon={ShieldAlert} label="Awaiting review" value={totals.review} hint={`${totals.rejected} rejected`} />
-            <StatCard icon={ClipboardList} label="Unvisited after shift end" value={totals.unvisited} hint={`${totals.remaining} not yet visited in open shifts`} />
-            <StatCard icon={FileDown} label="Missing attachments" value={totals.missingAttachments} hint="Evidence still awaiting upload or recovery" />
+            <StatCard icon={CheckCircle2} tone="success" label="Verified" value={`${totals.verified} of ${totals.required}`} hint={totals.completion === null ? 'No locations required' : `${Math.round(totals.completion)}% complete`} />
+            <StatCard icon={XCircle} tone={totals.missed ? 'danger' : 'brand'} label="Missed" value={totals.missed} hint="Not scanned before the patrol ended" />
+            <StatCard icon={Clock} tone={totals.pending ? 'warning' : 'brand'} label="Pending" value={totals.pending} hint="Not scanned yet; the patrol is still open" />
+            <StatCard icon={ShieldAlert} tone={totals.review ? 'warning' : 'brand'} label="Awaiting review" value={totals.review} hint={`${totals.rejected} rejected · ${totals.missingAttachments} photos not uploaded`} />
           </div>
           <Card title="Days" className="mb-[14px]">
-            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} days need a supervisor's explanation: no patrol recorded, missed, or not every location verified.` : 'No days need an explanation.'}</p>
+            <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} days need a supervisor's explanation: absent (no patrol), missed, or incomplete.` : 'No days need an explanation.'}</p>
             <Table head={['Date', 'Result', 'Verified / required', 'Guard on duty']}>
               {nights.map((n) => (
                 <tr key={n.date}>
                   <Td>{n.date}</Td>
-                  <Td><Badge label={n.status} tone={n.status === 'Completed' ? 'brand' : NIGHTS_NEEDING_ATTENTION.includes(n.status) ? 'warning' : 'neutral'} /></Td>
+                  <Td><Badge label={n.status} tone={resultTone(n.status)} /></Td>
                   <Td>{n.required ? `${n.verified} / ${n.required}` : '–'}</Td>
                   <Td>{n.guards.join(', ') || '–'}</Td>
                 </tr>
               ))}
             </Table>
           </Card>
-          <Card title="Shift log" className="mb-[14px]">
-            <Table head={['Shift date', 'Guard on duty', 'Route', 'Shift status', 'Actual start / end']}>
+          <Card title="Patrol log" className="mb-[14px]">
+            <Table head={['Date', 'Guard on duty', 'Status', 'Started', 'Ended']}>
               {report.shifts.map((s) => (
                 <tr key={s.id}>
-                  <Td>{s.patrol_date}</Td><Td>{s.guard_name ?? 'Unconfirmed'}<p className="text-xs text-muted-foreground">Login: {s.login_name}</p></Td>
-                  <Td>{s.route_name}{!s.checkpoints.length ? <p>No checkpoints configured</p> : null}</Td>
-                  <Td>{s.auto_closed_at ? 'Automatically closed; finish unconfirmed' : s.status}</Td>
-                  <Td>{evidenceTime(s.actual_start)}<br />{evidenceTime(s.actual_end)}</Td>
+                  <Td>{s.patrol_date}</Td><Td>{guardOnDuty(s)}<p className="text-xs text-muted-foreground">Account: {s.login_name}</p>{!s.checkpoints.length ? <p className="text-xs">No locations set</p> : null}</Td>
+                  <Td><Badge label={patrolResult(s)} tone={resultTone(patrolResult(s))} /></Td>
+                  <Td>{evidenceTime(s.actual_start)}</Td>
+                  <Td>{patrolEnd(s, report.generated_at)}</Td>
                 </tr>
               ))}
             </Table>
-            {!report.shifts.length ? <p className="py-4">No shifts scheduled in this range.</p> : null}
+            {!report.shifts.length ? <p className="py-4">No patrol was started in this period.</p> : null}
           </Card>
-          <Card title="Required locations">
-            <Table head={['Shift date', 'Guard', 'Checkpoint', 'Result', 'Captured / received (Muscat)', 'Position / accuracy', 'Evidence']}>
+          <Card title="Location checks">
+            <Table head={['Date', 'Guard', 'Location', 'Result', 'Scanned at (Muscat)', 'GPS position / accuracy', 'Evidence']}>
               {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((r) => (
                 <tr key={`${r.shift.id}:${r.checkpoint.id}`}>
-                  <Td>{r.shift.patrol_date}</Td><Td>{r.shift.guard_name ?? 'Unconfirmed'}</Td><Td>{r.checkpoint.name}</Td>
-                  <Td><Badge label={r.status} tone={r.status === 'Verified' ? 'brand' : 'neutral'} /></Td>
-                  <Td>{evidenceTime(r.scan?.device_time ?? null)}<br />{evidenceTime(r.scan?.server_time ?? null)}</Td>
-                  <Td>{coordinates(r.scan)}<br />{r.scan?.accuracy_m == null ? 'Accuracy unknown' : `±${r.scan.accuracy_m} m`}</Td>
+                  <Td>{r.shift.patrol_date}</Td><Td>{guardOnDuty(r.shift)}</Td><Td>{r.checkpoint.name}</Td>
+                  <Td><Badge label={r.status} tone={resultTone(r.status)} /></Td>
+                  <Td>{evidenceTime(r.scan?.device_time ?? null)}{r.scan ? <p className="text-xs text-muted-foreground">Received {evidenceTime(r.scan.server_time)}</p> : null}</Td>
+                  <Td>{coordinates(r.scan)}<br />{accuracy(r.scan)}</Td>
                   <Td><Button size="sm" variant="outline" disabled={!r.checkpoint.scans.length} onClick={() => setSelected(r)}>{r.checkpoint.scans.length} scan(s)</Button></Td>
                 </tr>
               ))}

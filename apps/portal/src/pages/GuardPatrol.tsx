@@ -12,6 +12,7 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
+import { BrandMark } from '@/components/BrandMark';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
 import { InstallPatrol } from '@/components/InstallPatrol';
 import { PatrolScanner } from '@/components/PatrolScanner';
@@ -133,7 +134,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
       <header inert={overlay} className="sticky top-0 z-30 bg-primary px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-4 text-white shadow-card">
         <div className="mx-auto max-w-xl">
           <div className="flex items-center gap-3">
-            <img src="/apple-touch-icon.png" alt="" className="size-10 rounded-xl" />
+            <BrandMark className="size-9 shrink-0" />
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg text-white">{active ? 'Patrol' : 'MB Security'}</h1>
               <p className="truncate text-sm text-white/80">{active ? `${shift.on_duty_name ?? fullName} · ends by itself ${formatTime(shift.scheduled_end)}` : fullName}</p>

@@ -159,7 +159,7 @@ export default function ShiftsPage() {
                           ) : null}
                         </Td>
                         <Td>{s.routes?.name}</Td>
-                        <Td><Badge {...(s.auto_closed_at ? { label: 'Auto-closed; finish unconfirmed', tone: 'neutral' as const } : SHIFT_STATUS[s.status])} /></Td>
+                        <Td><Badge {...(s.auto_closed_at ? { label: 'Closed automatically', tone: 'neutral' as const } : SHIFT_STATUS[s.status])} /></Td>
                         <Td className="text-xs text-muted-foreground">
                           {s.actual_start ? formatTime(s.actual_start) : '–'} / {s.actual_end ? formatTime(s.actual_end) : '–'}
                           {s.notes ? <span className="block">{s.notes}</span> : null}
