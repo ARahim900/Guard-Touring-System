@@ -1,17 +1,63 @@
-import { CheckCircle2, ClipboardList, FileDown, Play, ShieldAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { CheckCircle2, ClipboardList, FileDown, Play, RefreshCw, ShieldAlert } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ScanDetail } from '@/components/ScanDetail';
-import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, StatCard, Table, Td } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Spinner, StatCard, Table, Td } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { NIGHTS_NEEDING_ATTENTION, buildReportCsv, coordinates, evidenceTime, nightRows, reportTotals, visitRows, type PatrolReport, type VisitRow } from '@/lib/patrolReport';
 import { buildReportPdf } from '@/lib/reportPdf';
 import { supabase } from '@/lib/supabase';
-import { addDays, dayKey } from '@/lib/time';
-import { unwrap } from '@/lib/useAsync';
+import { addDays, dayKey, formatDay } from '@/lib/time';
+import { unwrap, useAsync } from '@/lib/useAsync';
 
 const PAGE_SIZE = 50;
+const DAILY_DAYS = 14;
+
+/** One ready-made report per day, built automatically from the scans: nothing to generate. */
+function DailyReports({ onView }: { onView: (date: string) => void }) {
+  const today = dayKey();
+  const { data, loading, error, reload } = useAsync(async () =>
+    unwrap(await supabase.rpc('patrol_report', { p_from: addDays(today, -(DAILY_DAYS - 1)), p_to: today, p_contractor_id: null })) as PatrolReport, [today]);
+  const days = data ? nightRows(data).reverse() : [];
+
+  function pdf(date: string) {
+    if (!data) return;
+    try {
+      buildReportPdf({ ...data, from_date: date, to_date: date, shifts: data.shifts.filter((s) => s.patrol_date === date) }).save(`MB_Patrol_${date}.pdf`);
+    } catch (e) {
+      toast.error(friendlyError(e, 'Could not create the PDF.'));
+    }
+  }
+
+  return (
+    <Card title="Daily reports" className="mb-[14px]" action={<Button size="sm" variant="ghost" icon={RefreshCw} disabled={loading} onClick={() => void reload()}>Refresh</Button>}>
+      <p className="mb-2 text-sm text-muted-foreground">Built automatically from every scan, one report per day (last {DAILY_DAYS} days). Today's report fills in as the patrol goes on.</p>
+      <ErrorNote message={error} />
+      {loading ? <Spinner label="Loading daily reports…" /> : (
+        <ul className="divide-y divide-border">
+          {days.map((d) => (
+            <li key={d.date} className="py-3 sm:flex sm:items-center sm:gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3 sm:justify-start">
+                  <p className="font-semibold">{d.date === today ? 'Today' : formatDay(`${d.date}T12:00:00+04:00`)}</p>
+                  <Badge label={d.status} tone={d.status === 'Completed' ? 'brand' : NIGHTS_NEEDING_ATTENTION.includes(d.status) ? 'warning' : 'neutral'} />
+                </div>
+                <p className="mt-0.5 text-sm text-muted-foreground">{d.required ? `${d.verified} of ${d.required} locations verified` : 'No scans on this day'}{d.guards.length ? ` · ${d.guards.join(', ')}` : ''}</p>
+              </div>
+              {d.required ? (
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-0 sm:flex">
+                  <Button size="sm" variant="outline" onClick={() => onView(d.date)}>View</Button>
+                  <Button size="sm" variant="secondary" icon={FileDown} onClick={() => pdf(d.date)}>PDF</Button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
 
 /** One-tap periods. A patrol belongs to the date it started. */
 function quickRanges(today = dayKey()) {
@@ -35,6 +81,7 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<VisitRow | null>(null);
+  const periodCard = useRef<HTMLDivElement>(null);
 
   async function run(start = from, end = to) {
     if (!start || !end || start > end) return setError('Choose a valid start and end date.');
@@ -90,7 +137,9 @@ export default function ReportsPage() {
   return (
     <>
       <PageHeader title="Patrol reports" subtitle="The daily report is built automatically from every scan, and every scan is kept permanently, so any period can be opened at any time. Visits after midnight stay with the date the patrol started." />
-      <Card className="mb-[14px]">
+      <DailyReports onView={(date) => { pick(date, date); periodCard.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} />
+      <div ref={periodCard} className="scroll-mt-32" />
+      <Card title="Any period" className="mb-[14px]">
         <div className="mb-3 flex flex-wrap gap-2">
           {quickRanges().map((r) => <Button key={r.label} size="sm" variant={from === r.from && to === r.to ? 'primary' : 'outline'} disabled={busy} onClick={() => pick(r.from, r.to)}>{r.label}</Button>)}
         </div>
