@@ -148,7 +148,10 @@ def main():
     # the phone rounds its corners. No transparency (iOS would add black).
     full_icon = lambda size: on_canvas(reversed_mark(size), size, 1.0, PURPLE).convert("RGB")
     full_icon(1024).save(guard / "icon.png")
-    full_icon(1024).save(ROOT / "apps" / "portal-ios" / "ios" / "MBPatrol" / "Assets.xcassets" / "AppIcon.appiconset" / "icon.png")
+    # The supervisor iPhone app (TestFlight) uses the same shield as the web app,
+    # so the icon is the same however the app was installed.
+    Image.open(WEB_ICON).convert("RGB").resize((1024, 1024), Image.LANCZOS).save(
+        ROOT / "apps" / "portal-ios" / "ios" / "MBPatrol" / "Assets.xcassets" / "AppIcon.appiconset" / "icon.png")
     # Android adaptive icon foreground: transparent, inside the 66% safe circle.
     # Its logo-purple background is set in app.config.ts (adaptiveIcon.backgroundColor).
     on_canvas(reversed_mark(1024), 1024, 0.46).save(guard / "adaptive-icon.png")
