@@ -97,7 +97,7 @@ createRoot(document.getElementById('root')!).render(
     <Sentry.ErrorBoundary fallback={<p className="p-8">Something went wrong. Please reload the page.</p>}>
       <AuthProvider>
         <RouterProvider router={router} />
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster position="top-right" className="mb-toaster" richColors closeButton />
       </AuthProvider>
     </Sentry.ErrorBoundary>
   </StrictMode>,

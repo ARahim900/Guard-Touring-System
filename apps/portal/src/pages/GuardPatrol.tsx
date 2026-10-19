@@ -3,7 +3,7 @@
 // =============================================================================
 // Layout, top to bottom: a header with a progress ring, the locations still to
 // visit as tiles (tap one at the location to open the camera for it, so the
-// guard chooses the order), an "Already scanned" panel that each location moves
+// guard chooses the order), separate saved, review and verified panels that each location moves
 // to once scanned, and a Scan button fixed at the bottom within thumb reach.
 // The QR label decides which location is recorded, whichever tile was tapped.
 // Every scan ends in a full-screen pop-up that says plainly whether the visit
@@ -41,7 +41,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const { snapshot, receipts, loading, syncing, cached, error, refresh } = useGuardPatrol(userId);
   // false = camera closed; null = opened from the Scan button; a name = opened from that location's tile.
   const [scanning, setScanning] = useState<false | null | string>(false);
-  // The location scanned last: its chip glows green in Already scanned once the pop-up closes.
+  // The location scanned last: its chip glows green in Verified once the pop-up closes.
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   // Every location verified: the guard may open the start card for another round.
   const [newRound, setNewRound] = useState(false);
@@ -62,6 +62,9 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const toVisit = rows.filter((row) => row.status === 'todo' || row.status === 'rejected');
   const visited = rows.filter((row) => row.status !== 'todo' && row.status !== 'rejected')
     .sort((a, b) => (b.checkpoint.scanned_at ?? '').localeCompare(a.checkpoint.scanned_at ?? ''));
+  const savedRows = visited.filter((row) => row.status === 'uploading');
+  const reviewRows = visited.filter((row) => row.status === 'review');
+  const verifiedRows = visited.filter((row) => row.status === 'verified');
   const verified = rows.filter((row) => row.status === 'verified').length;
   const uploading = rows.filter((row) => row.status === 'uploading').length;
   const review = rows.filter((row) => row.status === 'review').length;
@@ -137,18 +140,20 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
             <BrandMark className="size-9 shrink-0" />
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg text-white">{active ? 'Patrol' : 'MB Security'}</h1>
-              <p className="truncate text-sm text-white/80">{active ? `${shift.on_duty_name ?? fullName} · ends by itself ${formatTime(shift.scheduled_end)}` : fullName}</p>
+
             </div>
             <Link to="/" aria-label="Dashboard" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10"><LayoutDashboard className="size-5" aria-hidden="true" /></Link>
             <Link to="/reports" aria-label="Daily reports" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10"><FileText className="size-5" aria-hidden="true" /></Link>
             <button type="button" onClick={() => void leave()} disabled={overlay || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>
           </div>
+          <p className="mt-2 break-words text-sm text-white">{active ? shift.on_duty_name ?? fullName : fullName}</p>
+          {active ? <p className="mt-1 text-sm text-white/90">Ends automatically: {formatDateTime(shift.scheduled_end)} · Muscat</p> : null}
           {active && checkpoints.length ? (
             <div className="mt-4 flex items-center gap-4 rounded-2xl bg-white/10 px-4 py-3">
               <ProgressRing done={verified} total={checkpoints.length} />
               <div className="min-w-0">
                 <p className="text-lg font-semibold text-white">{verified} of {checkpoints.length} verified</p>
-                <p className="text-sm text-white/80">{[toVisit.length ? `${toVisit.length} to go` : 'All scanned', uploading ? `${uploading} uploading` : '', review ? `${review} in review` : ''].filter(Boolean).join(' · ')}</p>
+                <p className="text-sm text-white/80">{[toVisit.length ? `${toVisit.length} to go` : 'All scanned', uploading ? `${uploading} saved on phone` : '', review ? `${review} awaiting review` : ''].filter(Boolean).join(' · ')}</p>
               </div>
             </div>
           ) : null}
@@ -191,7 +196,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
 
         {!checkpoints.length ? <p className="rounded-xl bg-muted px-4 py-3">Your manager needs to add the patrol locations.</p> : null}
         {active && toVisit.length ? (
-          <Section title="To visit" count={toVisit.length} hint="At a location, tap it to scan its QR label. Once verified, it turns green and moves to Already scanned.">
+          <Section title="To visit" count={toVisit.length} hint="At a location, tap it to scan its QR label. Only verified visits count towards your progress.">
             <ul className="grid grid-cols-2 gap-3">
               {toVisit.map((row) => <li key={row.checkpoint.checkpoint_id}><LocationTile row={row} disabled={!canScan || scanning !== false || shown?.kind === 'checking'} onScan={() => openScanner(row.checkpoint.checkpoint_name)} /></li>)}
             </ul>
@@ -202,13 +207,9 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
             <ul className="flex flex-wrap gap-2">{rows.map((row) => <li key={row.checkpoint.checkpoint_id} className="rounded-full border border-border bg-card px-3 py-2 text-sm font-medium">{row.checkpoint.checkpoint_name}</li>)}</ul>
           </Section>
         ) : null}
-        {active && visited.length ? (
-          <section aria-labelledby="already-scanned" className="rounded-3xl border border-success bg-success-bg p-4">
-            <h2 id="already-scanned" className="mb-3 flex items-center gap-2 text-base text-success-text"><CheckCircle2 className="size-5" aria-hidden="true" />Already scanned
-              <span className="ml-auto rounded-full bg-card px-3 py-1 text-sm font-semibold tabular-nums">{visited.length}</span></h2>
-            <ul className="flex flex-wrap gap-2">{visited.map((row) => <li key={row.checkpoint.checkpoint_id}><VisitedChip row={row} fresh={!overlay && row.checkpoint.checkpoint_id === lastScanned} /></li>)}</ul>
-          </section>
-        ) : null}
+        {active && savedRows.length ? <VisitGroup title="Saved on this phone" rows={savedRows} tone="info" hint="Waiting for a connection and server confirmation. Keep the app open; these visits are not verified yet." /> : null}
+        {active && reviewRows.length ? <VisitGroup title="Awaiting review" rows={reviewRows} tone="warning" hint="Uploaded, but not yet verified. Your supervisor needs to review these visits." /> : null}
+        {active && verifiedRows.length ? <VisitGroup title="Verified" rows={verifiedRows} tone="success" hint="These visits count towards your patrol progress." freshId={!overlay ? lastScanned : null} /> : null}
 
         {thisShift.length ? (
           <details className="rounded-xl border border-border bg-card px-4 py-3">
@@ -287,15 +288,25 @@ function LocationTile({ row: { checkpoint, status }, disabled, onScan }: { row: 
 
 const CHIP: Record<Exclude<Status, 'todo' | 'rejected'>, { style: string; icon: ReactNode; label: (checkpoint: PatrolCheckpoint) => string }> = {
   verified: { style: 'bg-card text-success-text', icon: <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />, label: (c) => formatTime(c.scanned_at ?? '') },
-  uploading: { style: 'bg-card text-warning-text', icon: <CloudUpload className="size-4 shrink-0" aria-hidden="true" />, label: () => 'uploading' },
+  uploading: { style: 'bg-card text-info-text', icon: <CloudUpload className="size-4 shrink-0" aria-hidden="true" />, label: () => 'waiting to upload' },
   review: { style: 'bg-card text-warning-text', icon: <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />, label: () => 'in review' },
 };
+
+function VisitGroup({ title, rows, tone, hint, freshId }: { title: string; rows: Row[]; tone: 'success' | 'warning' | 'info'; hint: string; freshId?: string | null }) {
+  const styles = { success: 'border-success bg-success-bg text-success-text', warning: 'border-warning bg-warning-bg text-warning-text', info: 'border-info bg-info-bg text-info-text' };
+  const Icon = tone === 'success' ? CheckCircle2 : tone === 'warning' ? AlertTriangle : CloudUpload;
+  return <section aria-label={title} className={`rounded-2xl border p-4 ${styles[tone]}`}>
+    <h2 className="mb-2 flex items-center gap-2 text-base text-inherit"><Icon className="size-5 shrink-0" aria-hidden="true" />{title}<span className="ml-auto rounded-full bg-card px-3 py-1 text-sm font-semibold tabular-nums">{rows.length}</span></h2>
+    <p className="mb-3 text-sm">{hint}</p>
+    <ul className="flex flex-wrap gap-2">{rows.map((row) => <li className="min-w-0 max-w-full" key={row.checkpoint.checkpoint_id}><VisitedChip row={row} fresh={tone === 'success' && row.checkpoint.checkpoint_id === freshId} /></li>)}</ul>
+  </section>;
+}
 
 function VisitedChip({ row: { checkpoint, status }, fresh }: { row: Row; fresh: boolean }) {
   const chip = CHIP[status as keyof typeof CHIP];
   return (
-    <span className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${chip.style} ${fresh ? 'mb-arrive' : ''}`}>
-      {chip.icon}{checkpoint.checkpoint_name}<span className="font-normal tabular-nums opacity-80">· {chip.label(checkpoint)}</span>
+    <span className={`inline-flex min-h-10 max-w-full flex-wrap items-center gap-1.5 break-words rounded-xl px-3 py-1.5 text-sm font-medium ${chip.style} ${fresh ? 'mb-arrive' : ''}`}>
+      {chip.icon}{checkpoint.checkpoint_name}<span className="font-normal tabular-nums">· {chip.label(checkpoint)}</span>
     </span>
   );
 }

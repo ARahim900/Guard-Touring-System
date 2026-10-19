@@ -2,7 +2,7 @@
 // Reusable UI pieces styled with the Muscat Bay tokens (see index.css).
 // =============================================================================
 import { Loader2, X } from 'lucide-react';
-import { useEffect, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 import type { Tone } from '@/lib/labels';
 
@@ -16,8 +16,8 @@ const BTN: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-white hover:bg-primary-hover',
   secondary: 'bg-secondary text-primary hover:bg-secondary-active',
   outline: 'bg-card text-primary border border-border hover:bg-muted',
-  danger: 'bg-danger text-white hover:bg-danger-hover',
-  success: 'bg-success text-white hover:bg-[#6B9A87]',
+  danger: 'bg-danger-text text-white hover:bg-[#651717]',
+  success: 'bg-success-text text-white hover:bg-[#09452a]',
   ghost: 'text-primary hover:bg-muted',
 };
 
@@ -110,33 +110,59 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 
 // --------------------------------------------------------------------- Modal
 export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    const dialog = dialogRef.current;
+    if (!open || !dialog) return;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // The native modal top layer makes the rest of the document inert and
+    // contains keyboard focus, including when a second dialog opens above it.
+    dialog.showModal();
+    return () => {
+      dialog.close();
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    };
+  }, [open]);
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center" onMouseDown={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={cx('w-full rounded-lg bg-card shadow-card', wide ? 'max-w-4xl' : 'max-w-lg')}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-base">{title}</h2>
-          <button onClick={onClose} className="rounded-sm p-1 text-muted-foreground hover:bg-muted" aria-label="Close">
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      className={cx('fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto rounded-lg border-0 bg-card p-0 text-foreground shadow-card backdrop:bg-black/40', wide ? 'max-w-4xl' : 'max-w-lg')}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab' || (event.target as Element).closest('dialog') !== event.currentTarget) return;
+        const controls = [...event.currentTarget.querySelectorAll<HTMLElement>(
+          'a[href], button, input, select, textarea, [tabindex]',
+        )].filter((element) => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
+        const first = controls[0];
+        const last = controls.at(-1);
+        // Wrap at the ends instead of sending focus to browser chrome.
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();
+      }}
+    >
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h2 id={titleId} className="text-base">{title}</h2>
+          <button type="button" autoFocus onClick={onClose} className="flex size-11 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted" aria-label="Close">
             <X className="size-5" />
           </button>
-        </header>
+        </div>
         <div className="max-h-[75vh] overflow-y-auto p-5">{children}</div>
-        {footer ? <footer className="flex justify-end gap-2 border-t border-border px-5 py-3">{footer}</footer> : null}
-      </div>
-    </div>
+        {footer ? <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-3">{footer}</div> : null}
+    </dialog>
   );
 }
 
@@ -197,15 +223,15 @@ export function StatCard({ label, value, hint, icon: I, tone = 'brand' }: { labe
 }
 
 // -------------------------------------------------------------------- Table
-export function Table({ head, children }: { head: string[]; children: ReactNode }) {
+export function Table({ head, children, label = 'Scrollable data table' }: { head: string[]; children: ReactNode; label?: string }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-sm" tabIndex={0} role="region" aria-label={label}>
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border text-xs text-muted-foreground uppercase">
           <tr>
-            {head.map((h) => (
-              <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">
-                {h}
+            {head.map((h, index) => (
+              <th key={`${h}-${index}`} scope="col" className="px-3 py-2 font-semibold whitespace-nowrap">
+                {h || <span className="sr-only">Actions</span>}
               </th>
             ))}
           </tr>

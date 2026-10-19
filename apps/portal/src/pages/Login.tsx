@@ -29,7 +29,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-primary p-4">
+    <main className="flex min-h-full items-center justify-center bg-primary p-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg bg-card p-6 shadow-card">
         <div className="flex flex-col items-center gap-2 text-center">
           <img src="/muscat-bay-logo.png" alt="Muscat Bay" className="h-24 w-auto" />
@@ -51,6 +51,6 @@ export default function LoginPage() {
           Forgotten password? Ask an admin to reset it. · <Link to="/privacy" className="underline">Privacy</Link>
         </p>
       </form>
-    </div>
+    </main>
   );
 }

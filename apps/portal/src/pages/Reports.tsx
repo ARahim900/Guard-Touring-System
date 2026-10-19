@@ -89,30 +89,32 @@ export default function ReportsPage() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [view, setView] = useState<'summary' | 'evidence' | 'archive'>('summary');
   const [selected, setSelected] = useState<VisitRow | null>(null);
+  const request = useRef(0);
   const periodCard = useRef<HTMLDivElement>(null);
 
   async function run(start = from, end = to) {
     if (!start || !end || start > end) return setError('Choose a valid start and end date.');
+    const id = ++request.current;
     setBusy(true);
     setError(null);
     setReport(null);
     try {
       const result = unwrap(await supabase.rpc('patrol_report', { p_from: start, p_to: end, p_contractor_id: null })) as PatrolReport;
-      setReport(result);
-      setPage(0);
+      if (id === request.current) { setReport(result); setPage(0); }
     } catch (e) {
-      setError(friendlyError(e));
+      if (id === request.current) setError(friendlyError(e));
     } finally {
-      setBusy(false);
+      if (id === request.current) setBusy(false);
     }
   }
 
   // Opening Reports shows today's report straight away, built from every scan; nothing needs to be saved.
-  useEffect(() => { void run(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void run(); return () => { request.current++; }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function pick(start: string, end: string) {
-    setFrom(start); setTo(end);
+    setFrom(start); setTo(end); setView('summary');
     void run(start, end);
   }
 
@@ -146,22 +148,26 @@ export default function ReportsPage() {
   return (
     <>
       <PageHeader title="Patrol reports" subtitle="The daily report is built automatically from every scan, and every scan is kept permanently, so any period can be opened at any time. Visits after midnight stay with the date the patrol started." />
-      <DailyReports onView={(date) => { pick(date, date); periodCard.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} />
       <div ref={periodCard} className="scroll-mt-32" />
-      <Card title="Any period" className="mb-[14px]">
+      <Card title="Reporting period" className="mb-[14px]">
         <div className="mb-3 flex flex-wrap gap-2">
-          {quickRanges().map((r) => <Button key={r.label} size="sm" variant={from === r.from && to === r.to ? 'primary' : 'outline'} disabled={busy} onClick={() => pick(r.from, r.to)}>{r.label}</Button>)}
+          {quickRanges().map((r) => <Button key={r.label} size="sm" variant={from === r.from && to === r.to ? 'primary' : 'outline'} disabled={busy || exporting} onClick={() => pick(r.from, r.to)}>{r.label}</Button>)}
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="From date"><Input type="date" disabled={busy} value={from} onChange={(e) => { setFrom(e.target.value); setReport(null); }} /></Field>
-          <Field label="To date"><Input type="date" disabled={busy} value={to} min={from} onChange={(e) => { setTo(e.target.value); setReport(null); }} /></Field>
-          <Button icon={Play} loading={busy} onClick={() => void run()}>Generate report</Button>
+          <Field label="From date"><Input type="date" disabled={busy || exporting} value={from} onChange={(e) => { setFrom(e.target.value); setReport(null); }} /></Field>
+          <Field label="To date"><Input type="date" disabled={busy || exporting} value={to} min={from} onChange={(e) => { setTo(e.target.value); setReport(null); }} /></Field>
+          <Button icon={Play} loading={busy} disabled={exporting} onClick={() => { setView('summary'); void run(); }}>Generate report</Button>
           <Button variant="secondary" icon={FileDown} disabled={!report || exporting} onClick={() => void download('pdf')}>PDF</Button>
           <Button variant="outline" icon={FileDown} disabled={!report || exporting} onClick={() => void download('csv')}>Excel / CSV</Button>
         </div>
         <ErrorNote message={error} />
       </Card>
-      {report && totals ? (
+      <nav aria-label="Report views" className="mb-4 flex flex-wrap gap-2">
+        {([{ key: 'summary', label: 'Summary' }, { key: 'evidence', label: 'Location evidence' }, { key: 'archive', label: 'Daily archive' }] as const).map(({ key, label }) => <Button key={key} variant={view === key ? 'primary' : 'outline'} aria-pressed={view === key} onClick={() => setView(key)}>{label}</Button>)}
+      </nav>
+      {view === 'archive' ? <DailyReports onView={(date) => { pick(date, date); periodCard.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} /> : null}
+      {view !== 'archive' && busy ? <Spinner label="Loading report…" /> : null}
+      {view !== 'archive' && !busy && report && totals ? (
         <>
           <p className="mb-4 text-sm text-muted-foreground">Generated {evidenceTime(report.generated_at)} · Muscat time. Only scans received from the phones are shown. Cancelled patrols are left out of the totals.</p>
           <div className="mb-[14px] grid gap-[14px] sm:grid-cols-2 xl:grid-cols-4">
@@ -170,9 +176,10 @@ export default function ReportsPage() {
             <StatCard icon={Clock} tone={totals.pending ? 'warning' : 'brand'} label="Pending" value={totals.pending} hint="Not scanned yet; the patrol is still open" />
             <StatCard icon={ShieldAlert} tone={totals.review ? 'warning' : 'brand'} label="Awaiting review" value={totals.review} hint={`${totals.rejected} rejected · ${totals.missingAttachments} photos not uploaded`} />
           </div>
+          {view === 'summary' ? <>
           <Card title="Days" className="mb-[14px]">
             <p className="mb-3 text-sm">{attention ? `${attention} of ${nights.length} days need a supervisor's explanation: absent (no patrol), missed, or incomplete.` : 'No days need an explanation.'}</p>
-            <Table head={['Date', 'Result', 'Verified / required', 'Guard on duty']}>
+            <Table label="Daily report summary" head={['Date', 'Result', 'Verified / required', 'Guard on duty']}>
               {nights.map((n) => (
                 <tr key={n.date}>
                   <Td>{n.date}</Td>
@@ -184,7 +191,7 @@ export default function ReportsPage() {
             </Table>
           </Card>
           <Card title="Patrol log" className="mb-[14px]">
-            <Table head={['Date', 'Guard on duty', 'Status', 'Started', 'Ended']}>
+            <Table label="Patrol log" head={['Date', 'Guard on duty', 'Status', 'Started', 'Ended']}>
               {report.shifts.map((s) => (
                 <tr key={s.id}>
                   <Td>{s.patrol_date}</Td><Td>{guardOnDuty(s)}<p className="text-xs text-muted-foreground">Account: {s.login_name}</p>{!s.checkpoints.length ? <p className="text-xs">No locations set</p> : null}</Td>
@@ -196,8 +203,8 @@ export default function ReportsPage() {
             </Table>
             {!report.shifts.length ? <p className="py-4">No patrol was started in this period.</p> : null}
           </Card>
-          <Card title="Location checks">
-            <Table head={['Date', 'Guard', 'Location', 'Result', 'Scanned at (Muscat)', 'GPS position / accuracy', 'Evidence']}>
+          </> : <Card title="Location checks">
+            <Table label="Location evidence" head={['Date', 'Guard', 'Location', 'Result', 'Scanned at (Muscat)', 'GPS position / accuracy', 'Evidence']}>
               {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((r) => (
                 <tr key={`${r.shift.id}:${r.checkpoint.id}`}>
                   <Td>{r.shift.patrol_date}</Td><Td>{guardOnDuty(r.shift)}</Td><Td>{r.checkpoint.name}</Td>
@@ -213,9 +220,10 @@ export default function ReportsPage() {
               <span className="text-sm">Page {page + 1} of {pages} · {rows.length} locations</span>
               <Button variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>Next</Button>
             </div>
-          </Card>
+          </Card>}
         </>
-      ) : !busy ? <Card><EmptyState icon={ClipboardList} title="Choose your dates" message="Generate a report to review all required locations, including locations without a scan." /></Card> : null}
+      ) : null}
+      {view !== 'archive' && !busy && !report ? <Card><EmptyState icon={ClipboardList} title={error ? 'Report unavailable' : 'Choose your dates'} message={error ? 'Check the message above, then try Generate report again.' : 'Generate a report to review all required locations, including locations without a scan.'} /></Card> : null}
       <Modal open={Boolean(selected)} wide title={`Evidence · ${selected?.checkpoint.name ?? ''}`} onClose={() => setSelected(null)}>
         {selected?.checkpoint.scans.map((s) => <div key={s.id} className="mb-6 border-b border-border pb-6"><ScanDetail scanId={s.id} onChanged={() => { setSelected(null); void run(); }} /></div>)}
       </Modal>

@@ -78,7 +78,7 @@
     @apply font-serif font-semibold tracking-[-0.01em] text-primary;
   }
   :focus-visible {
-    @apply outline-none ring-3 ring-secondary ring-offset-2;
+    @apply outline-none ring-3 ring-primary ring-offset-2;
   }
 }
 
@@ -86,6 +86,15 @@
    sticky top bar, bottom bar, menus and dialogs always sit above it. */
 .leaflet-container {
   isolation: isolate;
+}
+
+/* Sonner's default rich success text misses 4.5:1 at its 13px size.
+   Use the same accessible semantic text colours as our status badges. */
+.mb-toaster[data-sonner-toaster][data-sonner-theme='light'] {
+  --success-text: var(--color-success-text);
+  --error-text: var(--color-danger-text);
+  --warning-text: var(--color-warning-text);
+  --info-text: var(--color-info-text);
 }
 
 /* Pulsing ring used for SOS markers on the live map. */

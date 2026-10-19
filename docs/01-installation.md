@@ -14,14 +14,16 @@ Follow the parts in order. Each step says **what** to do and **why**. Commands g
 
 ## Part 1: Tools
 
-### 1.1 Install Node.js 22 LTS
+### 1.1 Install Node.js 24 LTS
 Node.js runs the build tools for both apps.
-- Download the **LTS** installer from https://nodejs.org and install it with the default options.
+- Download the **Node.js 24 LTS** installer from https://nodejs.org and install it with the default options.
 - Check it worked:
   ```bash
-  node -v   # should print v22.x or later
+  node -v   # should print v24.x
   npm -v
   ```
+
+The repository pins Node in `.nvmrc`; with nvm, run `nvm install` and `nvm use` from the repository root. CI uses the same version, and the portal declares Node 24 for hosted builds.
 
 ### 1.2 Install Git and get the code
 ```bash

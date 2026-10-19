@@ -5,14 +5,16 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Modal, PageHeader, Select, Spinner, Table, Td, Textarea } from '@/components/ui';
+import { Pagination, RECORDS_PER_PAGE } from '@/components/Pagination';
 import { useAlarms } from '@/context/AlarmContext';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { ALARM_STATUS, ALARM_TYPE, guardName } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
+import { loadRecordPage } from '@/lib/recordPage';
 import { formatDateTime } from '@/lib/time';
 import type { Alarm, AlarmStatus, AlarmType } from '@/lib/types';
-import { unwrap, useAsync } from '@/lib/useAsync';
+import { useAsync } from '@/lib/useAsync';
 
 export default function AlarmsPage() {
   const { profile } = useAuth();
@@ -22,18 +24,19 @@ export default function AlarmsPage() {
   const [resolving, setResolving] = useState<Alarm | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   const { data, loading, error, reload } = useAsync(async () => {
     let q = supabase
       .from('alarms')
-      .select('*, profiles!alarms_guard_id_fkey(full_name, phone), shifts!alarms_shift_id_fkey(on_duty_name, on_duty_ref)')
+      .select('*, profiles!alarms_guard_id_fkey(full_name, phone), shifts!alarms_shift_id_fkey(on_duty_name, on_duty_ref)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(300);
+      .order('id', { ascending: false });
     if (status === 'unresolved') q = q.neq('status', 'resolved');
     else if (status !== 'all') q = q.eq('status', status);
     if (type !== 'all') q = q.eq('type', type);
-    return unwrap(await q) as Alarm[];
-  }, [status, type, version]);
+    return loadRecordPage<Alarm>((start, end) => q.range(start, end), page * RECORDS_PER_PAGE, RECORDS_PER_PAGE);
+  }, [status, type, version, page]);
 
   async function acknowledge(a: Alarm) {
     setBusy(a.id);
@@ -72,13 +75,27 @@ export default function AlarmsPage() {
     void refreshCounts();
   }
 
+  const details = (a: Alarm) => <>
+    <p>{a.message}</p>
+    {a.latitude !== null && a.longitude !== null ? <a
+      className="inline-flex min-h-11 items-center gap-1 text-sm text-primary underline"
+      href={`https://www.openstreetmap.org/?mlat=${a.latitude}&mlon=${a.longitude}#map=19/${a.latitude}/${a.longitude}`}
+      target="_blank" rel="noreferrer"
+    ><MapPin className="size-4" aria-hidden="true" />Position (±{Math.round(a.accuracy_m ?? 0)} m)</a> : null}
+    {a.resolution_note ? <p className="mt-1 text-sm text-muted-foreground">Note: {a.resolution_note}</p> : null}
+  </>;
+  const actions = (a: Alarm) => <div className="flex flex-wrap gap-2">
+    {a.status === 'open' ? <Button variant="outline" icon={Check} loading={busy === a.id} disabled={busy !== null} onClick={() => void acknowledge(a)}>Acknowledge</Button> : null}
+    {a.status !== 'resolved' ? <Button icon={CheckCheck} disabled={busy !== null} onClick={() => { setResolving(a); setNote(''); }}>Resolve</Button> : null}
+  </div>;
+
   return (
     <>
-      <PageHeader title="Alarms" subtitle="New alarms appear here instantly, with a sound and a pop-up." />
+      <PageHeader title="Alarms" subtitle="Review unresolved alerts and record the action taken. Sound depends on browser permissions and an active connection." />
       <Card>
         <div className="mb-4 flex flex-wrap gap-3">
           <Field label="Status" className="w-48">
-            <Select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+            <Select value={status} onChange={(e) => { setStatus(e.target.value as typeof status); setPage(0); }}>
               <option value="unresolved">Unresolved</option>
               <option value="open">Open</option>
               <option value="acknowledged">Acknowledged</option>
@@ -87,7 +104,7 @@ export default function AlarmsPage() {
             </Select>
           </Field>
           <Field label="Type" className="w-56">
-            <Select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+            <Select value={type} onChange={(e) => { setType(e.target.value as typeof type); setPage(0); }}>
               <option value="all">All types</option>
               {Object.entries(ALARM_TYPE).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
@@ -98,11 +115,23 @@ export default function AlarmsPage() {
         <ErrorNote message={error} />
         {loading ? (
           <Spinner />
-        ) : !data?.length ? (
+        ) : error ? <Button variant="outline" onClick={() => void reload()}>Try again</Button> : !data?.rows.length ? (
           <EmptyState icon={BellRing} title="No alarms" message="Nothing matches these filters." />
         ) : (
-          <Table head={['Raised', 'Type', 'Guard', 'Details', 'Status', '']}>
-            {data.map((a) => (
+          <>
+          <ul className="divide-y divide-border md:hidden">
+            {data.rows.map((a) => <li key={a.id} className={`space-y-3 py-4 ${a.type === 'sos' && a.status !== 'resolved' ? 'rounded-md bg-danger-bg px-3' : ''}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2"><Badge {...ALARM_TYPE[a.type]} /><Badge {...ALARM_STATUS[a.status]} /></div>
+              <div><p className="font-semibold">{guardName(a)}</p><p className="mt-1 text-sm text-muted-foreground">{formatDateTime(a.created_at)}</p>
+                {a.profiles?.phone ? <a className="inline-flex min-h-11 items-center underline" href={`tel:${a.profiles.phone}`}>{a.profiles.phone}</a> : null}
+              </div>
+              <div className="break-words text-sm">{details(a)}</div>
+              {actions(a)}
+            </li>)}
+          </ul>
+          <div className="hidden md:block">
+          <Table head={['Raised', 'Type', 'Guard', 'Details', 'Status', 'Actions']}>
+            {data.rows.map((a) => (
               <tr key={a.id} className={a.type === 'sos' && a.status !== 'resolved' ? 'bg-danger-bg' : ''}>
                 <Td className="whitespace-nowrap">{formatDateTime(a.created_at)}</Td>
                 <Td><Badge {...ALARM_TYPE[a.type]} /></Td>
@@ -111,32 +140,19 @@ export default function AlarmsPage() {
                   {a.profiles?.phone ? <a className="text-xs underline" href={`tel:${a.profiles.phone}`}>{a.profiles.phone}</a> : null}
                 </Td>
                 <Td>
-                  <p>{a.message}</p>
-                  {a.latitude !== null && a.longitude !== null ? (
-                    <a
-                      className="inline-flex items-center gap-1 text-xs text-primary underline"
-                      href={`https://www.openstreetmap.org/?mlat=${a.latitude}&mlon=${a.longitude}#map=19/${a.latitude}/${a.longitude}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <MapPin className="size-3" /> Position (±{Math.round(a.accuracy_m ?? 0)} m)
-                    </a>
-                  ) : null}
-                  {a.resolution_note ? <p className="text-xs text-muted-foreground">Note: {a.resolution_note}</p> : null}
+                  {details(a)}
                 </Td>
                 <Td><Badge {...ALARM_STATUS[a.status]} /></Td>
                 <Td className="whitespace-nowrap text-right">
-                  {a.status === 'open' ? (
-                    <Button size="sm" variant="outline" icon={Check} loading={busy === a.id} onClick={() => void acknowledge(a)}>Acknowledge</Button>
-                  ) : null}{' '}
-                  {a.status !== 'resolved' ? (
-                    <Button size="sm" icon={CheckCheck} onClick={() => { setResolving(a); setNote(''); }}>Resolve</Button>
-                  ) : null}
+                  {actions(a)}
                 </Td>
               </tr>
             ))}
           </Table>
+          </div>
+          </>
         )}
+        <Pagination page={page} total={error ? undefined : data?.total} loading={loading} onPageChange={setPage} />
       </Card>
 
       <Modal

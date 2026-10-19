@@ -4,14 +4,16 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ScanDetail } from '@/components/ScanDetail';
+import { Pagination, RECORDS_PER_PAGE } from '@/components/Pagination';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Modal, PageHeader, Select, Spinner, Table, Td, Textarea } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { INCIDENT_STATUS, SEVERITY, guardName } from '@/lib/labels';
 import { supabase } from '@/lib/supabase';
+import { loadRecordPage } from '@/lib/recordPage';
 import { formatDateTime } from '@/lib/time';
 import type { Incident, IncidentSeverity, IncidentStatus } from '@/lib/types';
-import { unwrap, useAsync } from '@/lib/useAsync';
+import { useAsync } from '@/lib/useAsync';
 
 export default function IncidentsPage() {
   const { profile } = useAuth();
@@ -19,17 +21,18 @@ export default function IncidentsPage() {
   const [editing, setEditing] = useState<Incident | null>(null);
   const [form, setForm] = useState({ status: 'open' as IncidentStatus, severity: 'medium' as IncidentSeverity, note: '' });
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(0);
 
   const { data, loading, error, reload } = useAsync(async () => {
     let q = supabase
       .from('incidents')
-      .select('*, profiles!incidents_guard_id_fkey(full_name), shifts!incidents_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name)')
+      .select('*, profiles!incidents_guard_id_fkey(full_name), shifts!incidents_shift_id_fkey(on_duty_name, on_duty_ref), checkpoints(name)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(300);
+      .order('id', { ascending: false });
     if (filter === 'unresolved') q = q.neq('status', 'resolved');
     else if (filter !== 'all') q = q.eq('status', filter);
-    return unwrap(await q) as Incident[];
-  }, [filter]);
+    return loadRecordPage<Incident>((start, end) => q.range(start, end), page * RECORDS_PER_PAGE, RECORDS_PER_PAGE);
+  }, [filter, page]);
 
   function open(i: Incident) {
     setEditing(i);
@@ -60,10 +63,10 @@ export default function IncidentsPage() {
 
   return (
     <>
-      <PageHeader title="Incidents" subtitle="Issues reported by guards at checkpoints, with their photos and voice memos." />
+      <PageHeader title="Incidents" subtitle="Review existing incident records and their evidence. Web patrol scans currently record normal visits only." />
       <Card>
         <Field label="Show" className="mb-4 w-48">
-          <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
+          <Select value={filter} onChange={(e) => { setFilter(e.target.value as typeof filter); setPage(0); }}>
             <option value="unresolved">Unresolved</option>
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>
@@ -74,11 +77,11 @@ export default function IncidentsPage() {
         <ErrorNote message={error} />
         {loading ? (
           <Spinner />
-        ) : !data?.length ? (
+        ) : error ? <Button variant="outline" onClick={() => void reload()}>Try again</Button> : !data?.rows.length ? (
           <EmptyState icon={ShieldAlert} title="No incidents" />
         ) : (
-          <Table head={['Reported', 'Checkpoint', 'Guard', 'Description', 'Severity', 'Status', '']}>
-            {data.map((i) => (
+          <Table head={['Reported', 'Checkpoint', 'Guard', 'Description', 'Severity', 'Status', 'Actions']}>
+            {data.rows.map((i) => (
               <tr key={i.id}>
                 <Td className="whitespace-nowrap">{formatDateTime(i.created_at)}</Td>
                 <Td>{i.checkpoints?.name}</Td>
@@ -91,6 +94,7 @@ export default function IncidentsPage() {
             ))}
           </Table>
         )}
+        <Pagination page={page} total={error ? undefined : data?.total} loading={loading} onPageChange={setPage} />
       </Card>
 
       <Modal
