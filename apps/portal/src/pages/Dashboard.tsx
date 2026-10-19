@@ -117,7 +117,7 @@ export default function DashboardPage() {
                 <Td className="font-medium">{guardName(s)}</Td>
                 <Td>{s.routes?.name}</Td>
                 <Td>{formatTime(s.scheduled_start)} – {formatTime(s.scheduled_end)}</Td>
-                <Td><Badge {...(s.auto_closed_at ? { label: 'Auto-closed; finish unconfirmed', tone: 'neutral' as const } : SHIFT_STATUS[s.status])} /></Td>
+                <Td><Badge {...(s.auto_closed_at ? { label: 'Closed automatically', tone: 'neutral' as const } : SHIFT_STATUS[s.status])} /></Td>
                 <Td>{c} / {rows.length}</Td>
               </tr>
             );

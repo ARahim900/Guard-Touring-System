@@ -6,14 +6,14 @@ const scan = (id, validation = 'valid') => ({ id, device_time:'2026-09-11T01:00:
 const shift = (overrides = {}) => ({ id:'shift-1', patrol_date:'2026-09-10', guard_name:null, guard_ref:null, login_name:'Test login', route_name:'Test route', status:'completed', scheduled_start:'2026-09-10T22:00:00+04:00', scheduled_end:'2026-09-11T06:00:00+04:00', actual_start:null, actual_end:null, auto_closed_at:'2026-09-11T06:05:00+04:00', checkpoints:[], ...overrides });
 const report = (shifts) => ({from_date:'2026-09-10',to_date:'2026-09-11',generated_at:'2026-09-11T10:00:00+04:00',shifts});
 
-test('duplicate scans count once; flagged, rejected and unvisited stay distinct', () => {
+test('duplicate scans count once; flagged, rejected and missed stay distinct', () => {
   const data = report([shift({checkpoints:[
     {id:'a',name:'A',sequence:1,scans:[scan('1'),scan('2')]},
     {id:'b',name:'B',sequence:2,scans:[scan('3','flagged')]},
     {id:'c',name:'C',sequence:3,scans:[scan('4','rejected')]},
     {id:'d',name:'D',sequence:4,scans:[]},
   ]})]);
-  assert.deepEqual(visitRows(data).map((r) => r.status),['Verified','Awaiting review','Rejected','Not visited']);
+  assert.deepEqual(visitRows(data).map((r) => r.status),['Verified','Awaiting review','Rejected','Missed']);
   const totals = reportTotals(data);
   assert.equal(totals.required,4);assert.equal(totals.verified,1);assert.equal(totals.completion,25);
 });
@@ -21,15 +21,15 @@ test('duplicate scans count once; flagged, rejected and unvisited stay distinct'
 test('open shift is not marked missed and cancelled shifts are excluded', () => {
   const checkpoint = {id:'a',name:'A',sequence:1,scans:[]};
   const data = report([shift({status:'active',scheduled_end:'2026-09-12T06:00:00+04:00',checkpoints:[checkpoint]}),shift({id:'2',status:'cancelled',checkpoints:[checkpoint]})]);
-  assert.deepEqual(visitRows(data).map((r) => r.status),['Not yet visited','Cancelled']);
-  assert.equal(reportTotals(data).required,1);assert.equal(reportTotals(data).unvisited,0);
+  assert.deepEqual(visitRows(data).map((r) => r.status),['Pending','Cancelled']);
+  assert.equal(reportTotals(data).required,1);assert.equal(reportTotals(data).missed,0);assert.equal(reportTotals(data).pending,1);
 });
 
-test('CSV preserves unknown readings, quotes and spreadsheet formula safety', () => {
+test('CSV leaves missing readings blank, quotes cells and blocks spreadsheet formulas', () => {
   const data=report([shift({guard_name:'=HYPERLINK("unsafe")',checkpoints:[{id:'a',name:'Gate, "one"',sequence:1,scans:[scan('1')]}]})]);
   const csv=buildReportCsv(data);
   assert.ok(csv.includes("'="));assert.ok(csv.includes('Gate, ""one""'));
-  assert.ok(csv.includes('"Unknown"'));assert.ok(csv.includes('11/09/2026, 01:00:00'));
+  assert.doesNotMatch(csv, /unknown/i);assert.ok(csv.includes('11/09/2026, 01:00:00'));
   assert.ok(csv.includes('11/09/2026, 09:00:00'));
   assert.ok(csv.includes('"","",""'));
 });
@@ -62,7 +62,7 @@ test('every night is listed, including a night with no patrol record at all', ()
   const nights = nightRows(data);
   assert.deepEqual(nights.map((n) => [n.date, n.status]), [
     ['2026-09-06','Completed'],['2026-09-07','Incomplete'],['2026-09-08','Missed'],
-    ['2026-09-09','No patrol recorded'],['2026-09-10','Cancelled'],['2026-09-11','In progress'],['2026-09-12','Upcoming'],
+    ['2026-09-09','Absent'],['2026-09-10','Cancelled'],['2026-09-11','In progress'],['2026-09-12','Upcoming'],
   ]);
   assert.equal(nights[1].verified,1);assert.equal(nights[1].required,2);
   assert.deepEqual(nights[0].guards,['Sample guard']);
