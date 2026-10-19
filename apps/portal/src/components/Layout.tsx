@@ -25,8 +25,8 @@ const pages: NavPage[] = [
   { to: '/alarms', label: 'Alarms', short: 'Alarms', icon: Bell },
   { to: '/live', label: 'Live map', short: 'Map', icon: MapIcon },
   { to: '/incidents', label: 'Incidents', icon: TriangleAlert },
-  { to: '/scans', label: 'Scans', short: 'Scans', icon: ScanLine },
-  { to: '/checkpoints', label: 'Locations', icon: MapPin },
+  { to: '/checkpoints', label: 'Locations', short: 'Locations', icon: MapPin },
+  { to: '/scans', label: 'Scans', icon: ScanLine },
   { to: '/reports', label: 'Reports', icon: FileText },
 ];
 const barPages = pages.filter((page) => page.short);
