@@ -5,7 +5,7 @@
 // away are rejected. Best practice: stand at the checkpoint with a tablet or
 // phone, open this page, and press "Use my location"; or click the map.
 // =============================================================================
-import { Crosshair, MapPin, Pencil, Plus, QrCode, ScanLine, Trash2 } from 'lucide-react';
+import { Crosshair, MapPin, Pencil, Plus, QrCode, RotateCcw, ScanLine, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Circle, Marker } from 'react-leaflet';
 import { Link } from 'react-router';
@@ -35,6 +35,10 @@ export default function CheckpointsPage() {
   const [deleting, setDeleting] = useState(false);
   const [locating, setLocating] = useState(false);
   const [qrPreview, setQrPreview] = useState<{ id?: string } | null>(null);
+  const [showRemoved, setShowRemoved] = useState(false);
+  // A deleted location with patrol history is kept (inactive) only so past reports stay complete; it leaves every list.
+  const removed = useMemo(() => (data ?? []).filter((c) => !c.active && c.placed_at), [data]);
+  const locations = useMemo(() => (data ?? []).filter((c) => c.active || !c.placed_at), [data]);
   // Labels are printed for locations in use AND for those not yet placed, so they can be fixed on site.
   const printable = useMemo(() => (data ?? []).filter((checkpoint) => checkpoint.active || !checkpoint.placed_at), [data]);
   const previewCheckpoints = useMemo(() => qrPreview?.id ? (data ?? []).filter((checkpoint) => checkpoint.id === qrPreview.id) : printable, [data, qrPreview, printable]);
@@ -64,18 +68,26 @@ export default function CheckpointsPage() {
   }
 
   /**
-   * Deletes a location with no patrol history. One with history is retired
-   * instead (hidden from guards), so past reports stay complete.
+   * Deletes a location: it leaves this list, the map and the guards' list at
+   * once. A location that was already scanned is kept out of sight so past
+   * reports stay complete; one with no history is erased.
    */
   async function remove() {
     if (!form?.id) return;
-    if (!window.confirm(`Delete "${form.name}"? Guards will no longer see it. If it has patrol history it is retired instead, so past reports stay complete.`)) return;
+    if (!window.confirm(`Delete "${form.name}"? It is removed from this list and from the guards' scan list straight away. Scans already made stay in past reports.`)) return;
     setDeleting(true);
-    const { data: outcome, error: deleteError } = await supabase.rpc('delete_checkpoint', { p_id: form.id });
+    const { error: deleteError } = await supabase.rpc('delete_checkpoint', { p_id: form.id });
     setDeleting(false);
     if (deleteError) return toast.error(friendlyError(deleteError));
-    toast.success(outcome === 'deleted' ? `${form.name} deleted.` : `${form.name} has patrol history, so it was retired (hidden from guards) instead. Past reports keep it.`);
+    toast.success(`${form.name} deleted.`);
     setForm(null);
+    void reload({ silent: true });
+  }
+
+  async function restore(c: Checkpoint) {
+    const { error: restoreError } = await supabase.from('checkpoints').update({ active: true }).eq('id', c.id);
+    if (restoreError) return toast.error(friendlyError(restoreError));
+    toast.success(`${c.name} restored. Guards will see it again.`);
     void reload({ silent: true });
   }
 
@@ -132,22 +144,39 @@ export default function CheckpointsPage() {
           <ErrorNote message={error} />
           {loading ? (
             <Spinner />
-          ) : !data?.length ? (
+          ) : !locations.length ? (
             <EmptyState icon={MapPin} title="No checkpoints yet" message="Create your first checkpoint, then print its QR label." />
           ) : (
             <Table head={['Name', 'Code', 'Radius', 'Status', 'QR code', '']}>
-              {data.map((c) => (
+              {locations.map((c) => (
                 <tr key={c.id}>
                   <Td className="font-medium">{c.name}</Td>
                   <Td className="font-mono text-xs">{c.code}</Td>
                   <Td>{c.radius_m} m</Td>
-                  <Td>{!c.placed_at ? <Badge label="Not placed" tone="warning" /> : c.active ? <Badge label="Active" tone="success" /> : <Badge label="Retired" />}</Td>
+                  <Td>{!c.placed_at ? <Badge label="Not placed" tone="warning" /> : <Badge label="Active" tone="success" />}</Td>
                   <Td><Button size="sm" variant="outline" icon={QrCode} aria-label={`View QR for ${c.name}`} onClick={() => setQrPreview({ id: c.id })}>View QR</Button></Td>
                   <Td className="text-right"><Button size="sm" variant="outline" icon={Pencil} onClick={() => edit(c)}>Edit</Button></Td>
                 </tr>
               ))}
             </Table>
           )}
+          {removed.length ? (
+            <div className="mt-4 border-t border-border pt-3 text-sm">
+              <button type="button" className="min-h-11 text-muted-foreground underline" onClick={() => setShowRemoved(!showRemoved)}>
+                {showRemoved ? 'Hide' : 'Show'} deleted locations ({removed.length})
+              </button>
+              {showRemoved ? (
+                <ul className="mt-2 divide-y divide-border">
+                  {removed.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-3 py-2">
+                      <span><span className="font-medium">{c.name}</span> <span className="font-mono text-xs text-muted-foreground">{c.code}</span></span>
+                      <Button size="sm" variant="outline" icon={RotateCcw} onClick={() => void restore(c)}>Restore</Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </Card>
         <Card className="min-w-0">
           <div className="-m-5">
@@ -192,10 +221,12 @@ export default function CheckpointsPage() {
               <Field label="Description / instructions (optional)">
                 <Textarea value={form.description ?? ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </Field>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
-                Active (untick to retire; history is kept)
-              </label>
+              {form.id && !form.placed_at ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
+                  Position is correct: guards can start scanning this location
+                </label>
+              ) : null}
             </div>
             <div>
               <p className="mb-1 text-sm font-medium">Click the map to set the position</p>
