@@ -150,7 +150,7 @@ export default function ReportsPage() {
       <PageHeader title="Patrol reports" subtitle="The daily report is built automatically from every scan, and every scan is kept permanently, so any period can be opened at any time. Visits after midnight stay with the date the patrol started." />
       <div ref={periodCard} className="scroll-mt-32" />
       <Card title="Reporting period" className="mb-[14px]">
-        <div role="group" aria-label="Quick reporting periods" className="mb-4 flex gap-2 overflow-x-auto pb-2 [&>button]:min-h-11 [&>button]:shrink-0 [&>button]:whitespace-nowrap">
+        <div role="group" aria-label="Quick reporting periods" className="mb-4 flex flex-wrap gap-2 [&>button]:min-h-11 [&>button]:whitespace-nowrap">
           {quickRanges().map((r) => <Button key={r.label} size="sm" variant={from === r.from && to === r.to ? 'primary' : 'outline'} disabled={busy || exporting} onClick={() => pick(r.from, r.to)}>{r.label}</Button>)}
         </div>
         <div className="grid min-w-0 grid-cols-2 items-end gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto]">

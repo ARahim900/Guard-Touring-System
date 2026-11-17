@@ -96,7 +96,7 @@ export default function CheckpointsPage() {
     const lat = Number(form.latitude);
     const lng = Number(form.longitude);
     const radius = Number(form.radius_m);
-    if (form.name.trim().length < 2) return toast.error('Enter a checkpoint name.');
+    if (form.name.trim().length < 2) return toast.error('Enter a location name.');
     if (!form.code.trim()) return toast.error('Enter a label code.');
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !form.latitude || !form.longitude) return toast.error('Set the position: click the map or use your location.');
     if (!(radius > 0 && radius <= 200)) return toast.error('Radius must be between 1 and 200 metres.');
@@ -134,8 +134,8 @@ export default function CheckpointsPage() {
         actions={
           <>
             <Button variant="outline" icon={QrCode} disabled={!printable.length} onClick={() => setQrPreview({})}>QR codes / print</Button>
-            <Link to="/checkpoints/place" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-primary px-4 text-sm font-semibold text-primary hover:bg-muted"><ScanLine className="size-4" aria-hidden="true" />Place locations{unplaced ? ` (${unplaced} to do)` : ''}</Link>
-            <Button icon={Plus} onClick={() => setForm(blank(nextCode(data ?? [])))}>New checkpoint</Button>
+            <Link to="/checkpoints/place" className="inline-flex min-h-11 items-center gap-2 rounded-md border border-primary sm:min-h-10 px-4 text-sm font-semibold text-primary hover:bg-muted"><ScanLine className="size-4" aria-hidden="true" />Place locations{unplaced ? ` (${unplaced} to do)` : ''}</Link>
+            <Button icon={Plus} onClick={() => setForm(blank(nextCode(data ?? [])))}>New location</Button>
           </>
         }
       />

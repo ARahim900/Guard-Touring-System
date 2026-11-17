@@ -61,6 +61,27 @@ function RequireStaff() {
   return <Outlet />;
 }
 
+/**
+ * When a new version of the app takes over, reload so the phone shows it
+ * straight away instead of keeping the old screens until the app is closed.
+ * During a patrol (the Scan screen) the reload waits until the app is next
+ * opened, so a scan in progress is never interrupted. Saved scans stay on the
+ * phone either way; a reload never deletes them.
+ */
+if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  let reloading = false;
+  const reload = () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const busy = window.location.pathname.startsWith('/guard') || document.querySelector('dialog[open]');
+    if (!busy || document.visibilityState === 'hidden') reload();
+    else document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reload(); });
+  });
+}
+
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/privacy', element: <PrivacyPage /> }, // public: linked from the app stores

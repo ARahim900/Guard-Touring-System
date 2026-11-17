@@ -2,7 +2,7 @@
 // Reusable UI pieces styled with the Muscat Bay tokens (see index.css).
 // =============================================================================
 import { ArrowLeft, ArrowRight, Loader2, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 import type { Tone } from '@/lib/labels';
 
@@ -37,7 +37,7 @@ export function Button({
       disabled={disabled || loading}
       className={cx(
         'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
-        size === 'sm' ? 'h-9 px-3 text-sm' : 'h-10 px-4 text-sm',
+        size === 'sm' ? 'min-h-11 px-3 text-sm sm:min-h-9' : 'min-h-11 px-4 text-sm sm:min-h-10',
         BTN[variant],
         className,
       )}
@@ -225,6 +225,19 @@ export function StatCard({ label, value, hint, icon: I, tone = 'brand' }: { labe
 // -------------------------------------------------------------------- Table
 export function Table({ head, children, label = 'Scrollable data table' }: { head: string[]; children: ReactNode; label?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  // On phones each row is shown as a card (see .mb-table in index.css). Every
+  // cell is labelled with its column heading so the card reads "Guard: Ali".
+  useLayoutEffect(() => {
+    const rows = scrollRef.current?.querySelectorAll('tbody > tr') ?? [];
+    for (const row of rows) {
+      let column = 0;
+      for (const cell of Array.from(row.children) as HTMLTableCellElement[]) {
+        const heading = cell.colSpan > 1 ? '' : head[column] ?? '';
+        if (heading) cell.dataset.label = heading; else delete cell.dataset.label;
+        column += cell.colSpan || 1;
+      }
+    }
+  });
   const hintId = useId();
   const [edges, setEdges] = useState({ left: false, right: false });
   function updateEdges() {
@@ -253,8 +266,8 @@ export function Table({ head, children, label = 'Scrollable data table' }: { hea
           <Button type="button" variant="outline" className="min-h-11 w-11 px-0" aria-label={`Scroll ${label} right`} disabled={!edges.right} onClick={() => scrollRef.current?.scrollBy({ left: 240, behavior: 'auto' })}><ArrowRight className="size-4" aria-hidden="true" /></Button>
         </div>
       </div> : null}
-      <div ref={scrollRef} onScroll={updateEdges} className="max-w-full overflow-x-auto overscroll-x-contain rounded-sm" tabIndex={0} role="region" aria-label={label} aria-describedby={overflowing ? hintId : undefined}>
-        <table className="w-full min-w-[40rem] text-left text-sm leading-5">
+      <div ref={scrollRef} onScroll={updateEdges} className="relative max-w-full overflow-x-auto overscroll-x-contain rounded-sm" tabIndex={0} role="region" aria-label={label} aria-describedby={overflowing ? hintId : undefined}>
+        <table className="mb-table w-full text-left text-sm leading-5 sm:min-w-[40rem]">
           <thead className="border-b border-border text-xs text-muted-foreground uppercase">
             <tr>
               {head.map((h, index) => (

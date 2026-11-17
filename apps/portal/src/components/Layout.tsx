@@ -201,7 +201,7 @@ export function Layout() {
   return (
     <div className="flex min-h-full flex-col bg-background">
       <div className="sticky top-0 z-40">
-        <header className="bg-primary px-4 py-2.5 text-white sm:px-6">
+        <header className="bg-primary px-[max(1rem,env(safe-area-inset-left))] pt-[calc(0.625rem+env(safe-area-inset-top))] pb-2.5 text-white sm:px-6">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
             <NavLink to="/" className="flex min-h-11 shrink-0 items-center gap-3 rounded-sm" aria-label="MB Security home">
               <BrandMark className="size-9" />
@@ -232,7 +232,7 @@ export function Layout() {
         </nav>
       </div>
 
-      <main className="mx-auto min-w-0 w-full max-w-5xl flex-1 px-4 pt-6 pb-28 sm:px-6 lg:pb-6"><Outlet /></main>
+      <main className="mx-auto min-w-0 w-full max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 lg:pb-6"><Outlet /></main>
 
       {guard ? <GuardNavigation /> : <nav aria-label="Main navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
         <ul className="grid grid-cols-5">

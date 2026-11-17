@@ -29,7 +29,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-full items-center justify-center bg-primary p-4">
+    <main className="flex min-h-full items-center justify-center bg-primary px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg bg-card p-6 shadow-card">
         <div className="flex flex-col items-center gap-2 text-center">
           <img src="/muscat-bay-logo.png" alt="Muscat Bay" className="h-24 w-auto" />

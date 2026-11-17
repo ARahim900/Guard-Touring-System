@@ -128,9 +128,9 @@ export default function ShiftsPage() {
       <ErrorNote message={guards.error ?? routes.error} />
       <Card>
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><ChevronLeft className="size-4" /></Button>
+          <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week" className="w-11 px-0"><ChevronLeft className="size-4" /></Button>
           <Input type="date" value={weekStart} onChange={(e) => e.target.value && setWeekStart(e.target.value)} className="w-44" />
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week"><ChevronRight className="size-4" /></Button>
+          <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week" className="w-11 px-0"><ChevronRight className="size-4" /></Button>
           <Button variant="ghost" size="sm" onClick={() => setWeekStart(dayKey())}>Today</Button>
           <span className="text-sm text-muted-foreground">{formatDay(`${weekStart}T12:00:00+04:00`)} – {formatDay(`${addDays(weekStart, 6)}T12:00:00+04:00`)}</span>
         </div>

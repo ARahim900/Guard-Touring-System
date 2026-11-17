@@ -69,7 +69,15 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
+  html {
+    /* Phone feel: no double-tap zoom delay, no grey flash when tapping. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
+    /* Anything positioned (e.g. hidden screen-reader text) stays inside the
+       phone width. Without this, iPhones widened the page and zoomed it out. */
+    position: relative;
     @apply bg-background text-foreground antialiased;
     font-size: 14px;
     font-variant-numeric: tabular-nums;
@@ -82,6 +90,100 @@
   :focus-visible {
     @apply outline-none ring-3 ring-primary ring-offset-2;
   }
+  /* Checkboxes large enough to tap with a thumb, in the brand colour. */
+  input[type='checkbox'] {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
+  }
+  /* Pressed state on phones, where there is no hover. */
+  button:not(:disabled):active,
+  a:active {
+    opacity: 0.85;
+  }
+}
+
+/* Buttons inside tables keep their label on one line. */
+.mb-table button {
+  white-space: nowrap;
+}
+
+/* Tables become a list of cards on phones: one card per row, each value
+   labelled with its column heading. Wider screens keep the normal table. */
+@media (max-width: 639px) {
+  .mb-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .mb-table,
+  .mb-table tbody,
+  .mb-table tr,
+  .mb-table td {
+    display: block;
+    width: 100%;
+  }
+  .mb-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border: 0;
+  }
+  .mb-table tbody > tr {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-card);
+    padding: 0.5rem 1rem;
+  }
+  .mb-table td {
+    max-width: none;
+    padding: 0.5rem 0;
+    white-space: normal;
+    text-align: left;
+  }
+  .mb-table td + td {
+    border-top: 1px solid var(--color-muted);
+  }
+  /* Label in the left 38%, the cell's own content untouched on the right. */
+  .mb-table td[data-label] {
+    position: relative;
+    padding-left: calc(38% + 0.75rem);
+    min-height: 2.25rem;
+  }
+  .mb-table td[data-label]::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0.5rem;
+    left: 0;
+    width: 38%;
+    color: var(--color-muted-foreground);
+    font-weight: 500;
+  }
+  /* The first cell is the card's title. */
+  .mb-table td[data-label]:first-child {
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+  /* Action buttons (column without a heading) sit full width at the bottom. */
+  .mb-table td:not([data-label]) > div,
+  .mb-table td:not([data-label]) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+}
+
+/* Leaflet's + and − zoom buttons at a thumb-friendly 44px on touch screens. */
+.leaflet-touch .leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 22px;
 }
 
 /* Keep Leaflet's internal layers (z-index up to 1000) inside the map, so the

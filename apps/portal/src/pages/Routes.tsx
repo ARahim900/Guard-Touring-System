@@ -112,7 +112,7 @@ export default function RoutesPage() {
                 <li key={r.id}>
                   <button
                     onClick={() => setSelected(r.id)}
-                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${selected === r.id ? 'bg-secondary-light font-semibold text-primary' : 'hover:bg-muted'}`}
+                    className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${selected === r.id ? 'bg-secondary-light font-semibold text-primary' : 'hover:bg-muted'}`}
                   >
                     <span>{r.name}</span>
                     <span className="flex items-center gap-2">

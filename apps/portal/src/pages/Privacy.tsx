@@ -49,7 +49,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
 export default function PrivacyPage() {
   return (
     <div className="min-h-full bg-background">
-      <header className="bg-primary px-6 py-6 text-white">
+      <header className="bg-primary px-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-6 text-white">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <span className="flex size-11 items-center justify-center rounded-md bg-white p-1.5">
             <img src="/muscat-bay-mark.png" alt="Muscat Bay" className="size-full" />

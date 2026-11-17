@@ -156,7 +156,7 @@ export default function GuardsPage() {
                 <Td>{p.employee_no ?? '–'}</Td>
                 <Td>{p.email}</Td>
                 <Td>{p.phone ?? '–'}</Td>
-                <Td><Badge label={p.role} tone={p.role === 'guard' ? 'brand' : 'info'} /></Td>
+                <Td><Badge label={{ guard: 'Guard', supervisor: 'Supervisor', admin: 'Admin' }[p.role]} tone={p.role === 'guard' ? 'brand' : 'info'} /></Td>
                 <Td>{p.active ? <Badge label="Active" tone="success" /> : <Badge label="Disabled" tone="danger" />}</Td>
                 <Td className="whitespace-nowrap text-right">
                   {canManage(p) ? (
