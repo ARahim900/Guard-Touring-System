@@ -12,6 +12,9 @@ export interface PatrolReceipt {
   latitude: number;
   longitude: number;
   accuracy: number;
+  /** 'issue' = the guard reported a problem at this location; the server opens an incident. */
+  status?: 'normal' | 'issue';
+  note?: string;
   state: 'pending' | 'synced';
   validation?: 'valid' | 'flagged' | 'rejected';
   flags?: string[];

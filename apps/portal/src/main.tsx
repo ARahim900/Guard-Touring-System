@@ -16,6 +16,7 @@ import { Spinner } from '@/components/ui';
 import { AlarmProvider } from '@/context/AlarmContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { env } from '@/lib/env';
+import { announceUpdate } from '@/lib/updateReady';
 import LoginPage from '@/pages/Login';
 import PrivacyPage from '@/pages/Privacy';
 
@@ -79,7 +80,10 @@ if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     const busy = window.location.pathname.startsWith('/guard') || document.querySelector('dialog[open]');
     if (!busy || document.visibilityState === 'hidden') reload();
-    else document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reload(); });
+    else {
+      announceUpdate();
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reload(); });
+    }
   });
 }
 
@@ -91,6 +95,7 @@ const router = createBrowserRouter([
     errorElement: <div className="mx-auto max-w-md space-y-4 p-6"><h1 className="text-xl">Please reload the app</h1><p>The app may have updated, or the connection was interrupted. Scans saved on this phone are kept.</p><button className="rounded-md bg-primary px-5 py-3 text-white" onClick={() => window.location.reload()}>Reload app</button></div>,
     children: [
       { path: 'guard', lazy: page(() => import('@/pages/GuardPatrol')) },
+      { path: 'guard/map', lazy: page(() => import('@/pages/GuardMap')) },
       {
         element: <PortalFrame />,
         children: [

@@ -49,7 +49,7 @@ export async function submitReceipt(receipt: PatrolReceipt): Promise<ScanVerdict
   if (session.session?.user.id !== receipt.userId) throw new Error('Sign in with the guard account that recorded these scans.');
   const { data, error } = await supabase.rpc('submit_scan', {
     p_scan_id: receipt.id, p_shift_id: receipt.shiftId, p_checkpoint_id: receipt.checkpointId,
-    p_method: receipt.method, p_raw_value: receipt.code, p_status: 'normal', p_note: null,
+    p_method: receipt.method, p_raw_value: receipt.code, p_status: receipt.status ?? 'normal', p_note: receipt.status === 'issue' ? receipt.note ?? null : null,
     p_device_time: receipt.deviceTime, p_device_sent_at: new Date().toISOString(),
     p_latitude: receipt.latitude, p_longitude: receipt.longitude, p_accuracy_m: receipt.accuracy,
     // Browsers do not expose Android's mock-location detector.
