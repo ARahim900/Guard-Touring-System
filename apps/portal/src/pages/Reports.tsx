@@ -209,7 +209,7 @@ export default function ReportsPage() {
                 <tr key={`${r.shift.id}:${r.checkpoint.id}`}>
                   <Td>{r.shift.patrol_date}</Td><Td>{guardOnDuty(r.shift)}</Td><Td>{r.checkpoint.name}</Td>
                   <Td><Badge label={r.status} tone={resultTone(r.status)} /></Td>
-                  <Td>{evidenceTime(r.scan?.device_time ?? null)}{r.scan ? <p className="text-xs text-muted-foreground">Received {evidenceTime(r.scan.server_time)}</p> : null}</Td>
+                  <Td>{evidenceTime(r.scan?.device_time ?? null)}{r.scan?.scanned_by ? <p className="text-xs font-medium">By {r.scan.scanned_by}</p> : null}{r.scan ? <p className="text-xs text-muted-foreground">Received {evidenceTime(r.scan.server_time)}</p> : null}</Td>
                   <Td>{coordinates(r.scan)}<br />{accuracy(r.scan)}</Td>
                   <Td><Button size="sm" variant="outline" disabled={!r.checkpoint.scans.length} onClick={() => setSelected(r)}>{r.checkpoint.scans.length} scan(s)</Button></Td>
                 </tr>

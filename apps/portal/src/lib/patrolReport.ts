@@ -12,6 +12,8 @@ export interface ReportScan {
   distance_m: number | null;
   status: 'normal' | 'issue';
   note: string | null;
+  /** Guard who made the scan; null for scans recorded before names were saved. */
+  scanned_by?: string | null;
   flags: string[];
   review_note: string | null;
   expected_attachments: number;
@@ -167,11 +169,11 @@ export function csvCell(value: string | number | null): string {
 }
 
 export function buildReportCsv(report: PatrolReport): string {
-  const head = ['Shift date', 'Guard on duty', 'Guard ID', 'Login', 'Route', 'Patrol status', 'Scheduled start (Muscat)', 'Scheduled end (Muscat)', 'Actual start (Muscat)', 'Actual end (Muscat)', 'Automatically closed (Muscat)', 'Checkpoint', 'Location result', 'Scan count', 'Captured time (Muscat)', 'Server received (Muscat)', 'Latitude', 'Longitude', 'GPS accuracy (m)', 'Issue notes', 'Missing attachments', 'Generated at (Muscat)'];
+  const head = ['Shift date', 'Guard on duty', 'Guard ID', 'Login', 'Route', 'Patrol status', 'Scheduled start (Muscat)', 'Scheduled end (Muscat)', 'Actual start (Muscat)', 'Actual end (Muscat)', 'Automatically closed (Muscat)', 'Checkpoint', 'Location result', 'Scanned by', 'Scan count', 'Captured time (Muscat)', 'Server received (Muscat)', 'Latitude', 'Longitude', 'GPS accuracy (m)', 'Issue notes', 'Missing attachments', 'Generated at (Muscat)'];
   const rows: (string | number | null)[][] = visitRows(report).map(({ shift: s, checkpoint: c, scan, status }) => [
     s.patrol_date, guardOnDuty(s), s.guard_ref, s.login_name, s.route_name, patrolResult(s),
     evidenceTime(s.scheduled_start, ''), evidenceTime(s.scheduled_end, ''), evidenceTime(s.actual_start, ''), evidenceTime(s.actual_end, ''),
-    evidenceTime(s.auto_closed_at, ''), c.name, status, c.scans.length,
+    evidenceTime(s.auto_closed_at, ''), c.name, status, scan?.scanned_by ?? '', c.scans.length,
     evidenceTime(scan?.device_time ?? null, ''), evidenceTime(scan?.server_time ?? null, ''),
     scan?.latitude ?? null, scan?.longitude ?? null, scan?.accuracy_m ?? null,
     c.scans.filter((x) => x.status === 'issue').map((x) => x.note ?? '').join(' | '),
@@ -181,7 +183,7 @@ export function buildReportCsv(report: PatrolReport): string {
   for (const s of report.shifts.filter((shift) => shift.checkpoints.length === 0)) {
     rows.push([s.patrol_date, guardOnDuty(s), s.guard_ref, s.login_name, s.route_name, patrolResult(s),
       evidenceTime(s.scheduled_start, ''), evidenceTime(s.scheduled_end, ''), evidenceTime(s.actual_start, ''), evidenceTime(s.actual_end, ''),
-      evidenceTime(s.auto_closed_at, ''), 'No checkpoints configured', '', 0, '', '', null, null, null, '', 0, evidenceTime(report.generated_at)]);
+      evidenceTime(s.auto_closed_at, ''), 'No checkpoints configured', '', '', 0, '', '', null, null, null, '', 0, evidenceTime(report.generated_at)]);
   }
   return '\uFEFF' + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }

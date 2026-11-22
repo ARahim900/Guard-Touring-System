@@ -47,14 +47,18 @@ export async function submitReceipt(receipt: PatrolReceipt): Promise<ScanVerdict
   const { data: session, error: sessionError } = await supabase.auth.getSession();
   if (sessionError) throw sessionError;
   if (session.session?.user.id !== receipt.userId) throw new Error('Sign in with the guard account that recorded these scans.');
-  const { data, error } = await supabase.rpc('submit_scan', {
+  const args = {
     p_scan_id: receipt.id, p_shift_id: receipt.shiftId, p_checkpoint_id: receipt.checkpointId,
     p_method: receipt.method, p_raw_value: receipt.code, p_status: receipt.status ?? 'normal', p_note: receipt.status === 'issue' ? receipt.note ?? null : null,
     p_device_time: receipt.deviceTime, p_device_sent_at: new Date().toISOString(),
     p_latitude: receipt.latitude, p_longitude: receipt.longitude, p_accuracy_m: receipt.accuracy,
     // Browsers do not expose Android's mock-location detector.
     p_is_mocked: null, p_expected_attachments: 0,
-  }).abortSignal(timeoutSignal(15000));
+  };
+  // Scans saved before names were recorded upload without one.
+  const { data, error } = await (receipt.guardName
+    ? supabase.rpc('submit_scan_as', { p_guard_name: receipt.guardName, ...args })
+    : supabase.rpc('submit_scan', args)).abortSignal(timeoutSignal(15000));
   if (error) throw error;
   const result = data as Partial<ScanVerdict> | null;
   if (!result || !['valid', 'flagged', 'rejected'].includes(result.validation ?? '') || !result.server_time || !Array.isArray(result.flags)) {
