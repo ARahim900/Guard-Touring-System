@@ -103,7 +103,8 @@ function describe(state: ConfirmState): { tone: Tone; key: string; title: string
   if (state.kind === 'notice') return { tone: state.tone, key: state.title, title: state.title, message: state.message, name: state.name };
   const { receipt } = state;
   const feedback = scanFeedback(receipt);
-  const meta = `Scanned ${formatTime(receipt.deviceTime)}${receipt.serverTime ? ` · confirmed ${formatTime(receipt.serverTime)}` : ''} · Muscat time`;
+  const reportNote = receipt.status !== 'issue' ? '' : receipt.state === 'synced' ? 'Problem sent to your supervisor · ' : 'Problem report saved, waiting to upload · ';
+  const meta = `${reportNote}Scanned ${formatTime(receipt.deviceTime)}${receipt.serverTime ? ` · confirmed ${formatTime(receipt.serverTime)}` : ''} · Muscat time`;
   if (feedback.tone === 'success') return { tone: 'success', key: `${receipt.id}-ok`, title: 'Visit verified', message: 'This location is done for tonight.', name: receipt.checkpointName, meta };
   if (feedback.tone === 'pending') return { tone: 'pending', key: `${receipt.id}-pending`, title: 'Saved on this phone', message: receipt.error ? `Not verified yet. ${receipt.error}` : 'Not verified yet. It uploads by itself as soon as the phone is connected; keep the app open.', name: receipt.checkpointName, meta };
   return { tone: feedback.tone, key: `${receipt.id}-${feedback.tone}`, title: feedback.tone === 'danger' ? 'Not counted' : 'Recorded – needs review', message: feedback.message, name: receipt.checkpointName, meta };

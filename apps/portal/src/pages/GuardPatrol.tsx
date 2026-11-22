@@ -9,17 +9,17 @@
 // Every scan ends in a full-screen pop-up that says plainly whether the visit
 // counted.
 // =============================================================================
-import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Map as MapIcon, Navigation, RefreshCw, ScanLine } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Map as MapIcon, MessageSquareWarning, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Link, Navigate, useSearchParams } from 'react-router';
 import { GuardNavigation } from '@/components/GuardNavigation';
 import { BrandMark } from '@/components/BrandMark';
-import { GuardPatrolMap } from '@/components/GuardPatrolMap';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
 import { InstallPatrol } from '@/components/InstallPatrol';
 import { PatrolScanner } from '@/components/PatrolScanner';
 import { ScanConfirm, type ConfirmState } from '@/components/ScanConfirm';
-import { ErrorNote, Spinner } from '@/components/ui';
+import { Button, ErrorNote, Field, Modal, Select, Spinner, Textarea } from '@/components/ui';
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { captureLocation, type PatrolCheckpoint } from '@/lib/guardPatrol';
@@ -47,12 +47,20 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   // Every location verified: the guard may open the start card for another round.
   const [newRound, setNewRound] = useState(false);
-  const [showMap, setShowMap] = useState(false);
+  // A problem the guard is reporting: it is sent with the scan of that location's QR label.
+  const [issue, setIssue] = useState<{ id: string; name: string; note: string } | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const [reportId, setReportId] = useState('');
+  const [reportNote, setReportNote] = useState('');
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const scanInProgress = useRef(false);
   const shift = snapshot?.shift;
   const active = shift?.status === 'active';
+  // A problem report belongs to the shift in which it was prepared.
+  useEffect(() => { setIssue(null); }, [shift?.id]);
   const checkpoints = snapshot?.checkpoints ?? [];
   const pending = receipts.filter((receipt) => receipt.state === 'pending');
   const inWindow = Boolean(shift && Date.now() >= Date.parse(shift.scheduled_start) && Date.now() <= Date.parse(shift.scheduled_end));
@@ -90,6 +98,32 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
     setActionError(null); setConfirm(null); setScanning(target);
   }
 
+  // "Scan" on the Map tab opens the camera here for that location.
+  const scanTarget = params.get('scan');
+  useEffect(() => {
+    if (!scanTarget || loading) return;
+    setParams({}, { replace: true });
+    const target = toVisit.find((row) => row.checkpoint.checkpoint_id === scanTarget);
+    if (target && canScan) openScanner(target.checkpoint.checkpoint_name);
+  }, [scanTarget, loading, canScan, toVisit, setParams]);
+
+  function startReport() {
+    setReportId(issue?.id ?? toVisit[0]?.checkpoint.checkpoint_id ?? '');
+    setReportNote(issue?.note ?? '');
+    setReportError(null);
+    setReporting(true);
+  }
+
+  function confirmReport() {
+    const target = toVisit.find((row) => row.checkpoint.checkpoint_id === reportId);
+    const note = reportNote.trim();
+    if (!target) return setReportError('Choose the location.');
+    if (note.length < 3) return setReportError('Describe the problem.');
+    setIssue({ id: target.checkpoint.checkpoint_id, name: target.checkpoint.checkpoint_name, note });
+    setReporting(false);
+    openScanner(target.checkpoint.checkpoint_name);
+  }
+
   async function record(code: string, method: 'qr' | 'barcode') {
     if (scanInProgress.current) return;
     scanInProgress.current = true;
@@ -106,6 +140,10 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         setConfirm({ kind: 'notice', tone: 'info', name: checkpoint.checkpoint_name, title: 'Already verified', message: `Verified at ${formatTime(checkpoint.scanned_at ?? '')}. No need to scan it again tonight.` });
         return;
       }
+      if (issue && issue.id !== checkpoint.checkpoint_id) {
+        setConfirm({ kind: 'notice', tone: 'danger', name: checkpoint.checkpoint_name, title: 'Wrong QR label for this report', message: `Your problem report is for ${issue.name}. Scan the QR label at ${issue.name} to send it, or cancel the report.` });
+        return;
+      }
       if ((await readReceipts(userId)).some((item) => item.shiftId === shift.id && item.checkpointId === checkpoint.checkpoint_id && item.state === 'pending')) {
         setConfirm({ kind: 'notice', tone: 'info', name: checkpoint.checkpoint_name, title: 'Already saved on this phone', message: 'This visit is waiting to upload. It uploads by itself when there is a connection.' });
         return;
@@ -117,8 +155,10 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         id: crypto.randomUUID(), userId, shiftId: shift.id, checkpointId: checkpoint.checkpoint_id,
         checkpointName: checkpoint.checkpoint_name, code: code.trim(), method, deviceTime,
         latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, state: 'pending',
+        ...(issue ? { status: 'issue' as const, note: issue.note } : {}),
       };
       await saveReceipt(receipt);
+      setIssue(null);
       setConfirm({ kind: 'checking', name: checkpoint.checkpoint_name, message: 'Verifying the visit…' });
       await refresh(true);
       setConfirm({ kind: 'receipt', receipt });
@@ -164,6 +204,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
       </header>
 
       <main inert={overlay} className={`mx-auto max-w-xl space-y-5 px-4 pt-4 ${active ? 'pb-[calc(13rem+env(safe-area-inset-bottom))] lg:pb-36' : 'pb-28 lg:pb-10'}`}>
+        <UpdateBanner />
         <ErrorNote message={actionError ?? error} />
         {cached ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">Showing the patrol saved on this phone. It could not be updated just now.</p> : null}
         {pending.length ? (
@@ -198,6 +239,21 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         ) : null}
 
         {!checkpoints.length ? <p className="rounded-xl bg-muted px-4 py-3">Your manager needs to add the patrol locations.</p> : null}
+        {active && issue ? (
+          <div role="status" className="rounded-2xl border border-warning bg-warning-bg px-4 py-3 text-warning-text">
+            <p className="font-semibold">Problem report for {issue.name} is ready</p>
+            <p className="mt-1 text-sm">Scan the QR label at {issue.name} to send it with your visit.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => openScanner(issue.name)} disabled={!canScan || scanning !== false} className="flex min-h-11 items-center gap-2 rounded-xl bg-warning-text px-4 text-sm font-semibold text-white disabled:opacity-50"><ScanLine className="size-4" aria-hidden="true" />Scan now</button>
+              <button type="button" onClick={startReport} className="min-h-11 rounded-xl px-3 text-sm font-semibold underline">Edit</button>
+              <button type="button" onClick={() => setIssue(null)} className="min-h-11 rounded-xl px-3 text-sm font-semibold underline">Cancel report</button>
+            </div>
+          </div>
+        ) : active && toVisit.length ? (
+          <button type="button" onClick={startReport} disabled={!canScan} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-semibold text-primary disabled:opacity-50">
+            <MessageSquareWarning className="size-5" aria-hidden="true" />Report a problem at a location
+          </button>
+        ) : null}
         {active && toVisit.length ? (
           <Section title="To visit" count={toVisit.length} hint="At a location, tap it to scan its QR label. Only verified visits count towards your progress.">
             <ul className="grid grid-cols-2 gap-3">
@@ -211,12 +267,9 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           </Section>
         ) : null}
         {checkpoints.length ? (
-          <section aria-label="Map of locations">
-            <button type="button" aria-expanded={showMap} onClick={() => setShowMap(!showMap)} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-semibold text-primary">
-              <MapIcon className="size-5" aria-hidden="true" />{showMap ? 'Hide map' : 'Show locations on map'}
-            </button>
-            {showMap ? <div className="mt-3"><GuardPatrolMap checkpoints={checkpoints} /></div> : null}
-          </section>
+          <Link to="/guard/map" className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-semibold text-primary">
+            <MapIcon className="size-5" aria-hidden="true" />Open the map of locations
+          </Link>
         ) : null}
         {active && savedRows.length ? <VisitGroup title="Saved on this phone" rows={savedRows} tone="info" hint="Waiting for a connection and server confirmation. Keep the app open; these visits are not verified yet." /> : null}
         {active && reviewRows.length ? <VisitGroup title="Awaiting review" rows={reviewRows} tone="warning" hint="Uploaded, but not yet verified. Your supervisor needs to review these visits." /> : null}
@@ -244,6 +297,22 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         </div>
       ) : null}
 
+      <Modal open={reporting} title="Report a problem" onClose={() => setReporting(false)} footer={<>
+        <Button variant="outline" onClick={() => setReporting(false)}>Cancel</Button>
+        <Button onClick={confirmReport}><ScanLine className="size-4" aria-hidden="true" />Scan the label to send</Button>
+      </>}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">For example a broken light, an open gate or damage. The report goes to your supervisor when you scan the location’s QR label.</p>
+          <Field label="Location">
+            <Select value={reportId} onChange={(event) => setReportId(event.target.value)}>
+              {toVisit.map((row) => <option key={row.checkpoint.checkpoint_id} value={row.checkpoint.checkpoint_id}>{row.checkpoint.checkpoint_name}</option>)}
+            </Select>
+          </Field>
+          <Field label="What is the problem?" error={reportError}>
+            <Textarea value={reportNote} maxLength={500} rows={4} onChange={(event) => setReportNote(event.target.value)} />
+          </Field>
+        </div>
+      </Modal>
       <GuardNavigation inert={overlay} />
       {scanning !== false && active ? <PatrolScanner fullscreen target={scanning ?? undefined} onScan={(code, method) => void record(code, method)} onClose={() => setScanning(false)} /> : null}
       {shown ? <ScanConfirm state={shown} done={verified} total={checkpoints.length} canScan={canScan} busy={syncing}
