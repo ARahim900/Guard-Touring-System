@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { timeoutSignal } from '@/lib/timeoutSignal';
 import type { Shift } from '@/lib/types';
 import type { PatrolReceipt, ScanVerdict } from '@/lib/guardOutbox';
 
@@ -16,7 +17,7 @@ export interface PatrolCheckpoint {
 export interface PatrolSnapshot { guardNames: string[]; startTime: string | null; endTime: string | null; shift: Shift | null; checkpoints: PatrolCheckpoint[]; updatedAt: string }
 
 export async function fetchPatrol(userId: string): Promise<PatrolSnapshot> {
-  const { error: preparationError } = await supabase.rpc('prepare_my_patrol').abortSignal(AbortSignal.timeout(15000));
+  const { error: preparationError } = await supabase.rpc('prepare_my_patrol').abortSignal(timeoutSignal(15000));
   if (preparationError) throw preparationError;
   const roster = await supabase.from('app_settings').select('guard_names, night_shift_start, night_shift_end').eq('id', 1).single<{ guard_names: string[]; night_shift_start: string | null; night_shift_end: string | null }>();
   if (roster.error) throw roster.error;
@@ -26,18 +27,18 @@ export async function fetchPatrol(userId: string): Promise<PatrolSnapshot> {
     .select('id, guard_id, route_id, scheduled_start, scheduled_end, actual_start, actual_end, auto_closed_at, status, notes, on_duty_name, on_duty_ref, routes(name)')
     .eq('guard_id', userId).in('status', ['active', 'scheduled'])
     .gt('scheduled_end', new Date().toISOString()).order('scheduled_start')
-    .limit(100).returns<Shift[]>().abortSignal(AbortSignal.timeout(15000));
+    .limit(100).returns<Shift[]>().abortSignal(timeoutSignal(15000));
   if (error) throw error;
   const shift = data?.find((item) => item.status === 'active') ?? data?.[0] ?? null;
   if (!shift || shift.status !== 'active') {
-    const locations = await supabase.rpc('patrol_locations').select('id, name, code, latitude, longitude').returns<{ id: string; name: string; code: string; latitude: number; longitude: number }[]>().abortSignal(AbortSignal.timeout(15000));
+    const locations = await supabase.rpc('patrol_locations').select('id, name, code, latitude, longitude').returns<{ id: string; name: string; code: string; latitude: number; longitude: number }[]>().abortSignal(timeoutSignal(15000));
     if (locations.error) throw locations.error;
     if (!Array.isArray(locations.data)) throw new Error('Could not load the patrol locations. Try again.');
     return { guardNames, ...hours, shift: null, checkpoints: (locations.data ?? []).map((location, index) => ({ checkpoint_id: location.id, checkpoint_name: location.name, code: location.code, latitude: location.latitude, longitude: location.longitude, sequence: index + 1, completed: false, validation: null, scanned_at: null })), updatedAt: new Date().toISOString() };
   }
   const checkpoints = await supabase.from('shift_checkpoint_status')
     .select('checkpoint_id, checkpoint_name, code, sequence, completed, validation, scanned_at, latitude, longitude')
-    .eq('shift_id', shift.id).order('sequence').returns<PatrolCheckpoint[]>().abortSignal(AbortSignal.timeout(15000));
+    .eq('shift_id', shift.id).order('sequence').returns<PatrolCheckpoint[]>().abortSignal(timeoutSignal(15000));
   if (checkpoints.error) throw checkpoints.error;
   return { guardNames, ...hours, shift, checkpoints: checkpoints.data ?? [], updatedAt: new Date().toISOString() };
 }
@@ -53,7 +54,7 @@ export async function submitReceipt(receipt: PatrolReceipt): Promise<ScanVerdict
     p_latitude: receipt.latitude, p_longitude: receipt.longitude, p_accuracy_m: receipt.accuracy,
     // Browsers do not expose Android's mock-location detector.
     p_is_mocked: null, p_expected_attachments: 0,
-  }).abortSignal(AbortSignal.timeout(15000));
+  }).abortSignal(timeoutSignal(15000));
   if (error) throw error;
   const result = data as Partial<ScanVerdict> | null;
   if (!result || !['valid', 'flagged', 'rejected'].includes(result.validation ?? '') || !result.server_time || !Array.isArray(result.flags)) {
