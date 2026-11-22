@@ -6,7 +6,7 @@
 // patrol order before that), each with directions and a shortcut that opens the
 // camera for it on the Scan tab.
 // =============================================================================
-import { Navigation, RefreshCw, ScanLine } from 'lucide-react';
+import { FileText, LayoutDashboard, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router';
 
@@ -49,6 +49,9 @@ function GuardMap({ userId }: { userId: string }) {
             <h1 className="truncate text-lg text-white">Map</h1>
             <p className="text-sm text-white/90">{active && checkpoints.length ? `${verified} of ${checkpoints.length} verified · ${toVisit.length} to go` : `${checkpoints.length} patrol locations`}</p>
           </div>
+          <Link to="/guard" aria-label="Scan" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10"><ScanLine className="size-5" aria-hidden="true" /></Link>
+          <Link to="/" aria-label="Dashboard" className="hidden size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 lg:flex"><LayoutDashboard className="size-5" aria-hidden="true" /></Link>
+          <Link to="/reports" aria-label="Daily reports" className="hidden size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 lg:flex"><FileText className="size-5" aria-hidden="true" /></Link>
           <button type="button" onClick={() => void refresh(true)} disabled={syncing} aria-label="Refresh" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50">
             <RefreshCw className={`size-5 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />
           </button>

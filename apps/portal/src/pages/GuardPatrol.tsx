@@ -59,6 +59,8 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const scanInProgress = useRef(false);
   const shift = snapshot?.shift;
   const active = shift?.status === 'active';
+  // A problem report belongs to the shift in which it was prepared.
+  useEffect(() => { setIssue(null); }, [shift?.id]);
   const checkpoints = snapshot?.checkpoints ?? [];
   const pending = receipts.filter((receipt) => receipt.state === 'pending');
   const inWindow = Boolean(shift && Date.now() >= Date.parse(shift.scheduled_start) && Date.now() <= Date.parse(shift.scheduled_end));

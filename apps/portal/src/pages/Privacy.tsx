@@ -13,10 +13,10 @@ const SECTIONS: { title: string; body: string[] }[] = [
     body: [
       'Account details: name, work email, employee number and phone number. Used to sign you in and to identify your patrol records. Where a login is shared, the guard name chosen at the start of a patrol is recorded with that shift for the same purpose.',
       'Checkpoint scans: the location scanned, the guard name selected for the patrol, the time on your phone and on our server, and your GPS position and its accuracy. These records help confirm that each location was visited. The browser does not report whether GPS is simulated.',
-      'Location access: the web portal requests a current GPS position when you scan, or when a supervisor chooses to use their location to place a checkpoint. It does not track your position in the background or while the app is closed.',
+      'Location access: the web portal requests a current GPS position when you scan, when a guard taps “Show where I am” on the patrol map, or when a supervisor chooses to use their location to place a checkpoint. The map position is shown on the phone only; it is not saved or sent. The portal does not track your position in the background or while the app is closed.',
       'Camera access: the web portal uses your camera to read QR codes and barcodes. The scanner does not save or upload camera images. Closing the scanner or leaving the app stops its camera stream.',
       'Phone storage: your patrol details and scans are stored on this device so saved scans can be retried after a connection failure. Keep the app open to upload pending scans. Clearing browser storage can remove scans that have not yet uploaded.',
-      'Existing evidence: authorised supervisors can view and review stored notes, photos, voice memos, incidents and alarms. The current web scanning flow records normal visits; it does not submit photos, voice memos or SOS alerts.',
+      'Existing evidence: authorised supervisors can view and review stored notes, photos, voice memos, incidents and alarms. The web scanning flow records visits and, when a guard reports a problem at a location, the guard’s written note, which opens an incident for supervisors. It does not submit photos, voice memos or SOS alerts.',
       'Diagnostics: if crash reporting is enabled, the web portal sends error and browser information to Sentry to help diagnose failures.',
       'Web updates: the browser downloads application files from our website and caches them for faster reopening. The web portal does not use Expo update services.',
     ],

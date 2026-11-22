@@ -5,7 +5,11 @@ import { isUpdateReady, onUpdateReady } from '@/lib/updateReady';
 /** Offers the new app version on the patrol screens. Saved scans stay on the phone through a reload. */
 export function UpdateBanner() {
   const [ready, setReady] = useState(isUpdateReady);
-  useEffect(() => onUpdateReady(() => setReady(true)), []);
+  useEffect(() => {
+    const unsubscribe = onUpdateReady(() => setReady(true));
+    if (isUpdateReady()) setReady(true);
+    return unsubscribe;
+  }, []);
   if (!ready) return null;
   return (
     <div role="status" className="flex items-center gap-3 rounded-xl border border-info bg-info-bg px-4 py-3 text-info-text">
