@@ -9,11 +9,12 @@
 // Every scan ends in a full-screen pop-up that says plainly whether the visit
 // counted.
 // =============================================================================
-import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Navigation, RefreshCw, ScanLine } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Map as MapIcon, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router';
 import { GuardNavigation } from '@/components/GuardNavigation';
 import { BrandMark } from '@/components/BrandMark';
+import { GuardPatrolMap } from '@/components/GuardPatrolMap';
 import { GuardShiftStart } from '@/components/GuardShiftStart';
 import { InstallPatrol } from '@/components/InstallPatrol';
 import { PatrolScanner } from '@/components/PatrolScanner';
@@ -46,6 +47,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   // Every location verified: the guard may open the start card for another round.
   const [newRound, setNewRound] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const scanInProgress = useRef(false);
@@ -207,6 +209,14 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           <Section title="Tonight’s locations" count={rows.length}>
             <ul className="flex flex-wrap gap-2">{rows.map((row) => <li key={row.checkpoint.checkpoint_id} className="rounded-full border border-border bg-card px-3 py-2 text-sm font-medium">{row.checkpoint.checkpoint_name}</li>)}</ul>
           </Section>
+        ) : null}
+        {checkpoints.length ? (
+          <section aria-label="Map of locations">
+            <button type="button" aria-expanded={showMap} onClick={() => setShowMap(!showMap)} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-semibold text-primary">
+              <MapIcon className="size-5" aria-hidden="true" />{showMap ? 'Hide map' : 'Show locations on map'}
+            </button>
+            {showMap ? <div className="mt-3"><GuardPatrolMap checkpoints={checkpoints} /></div> : null}
+          </section>
         ) : null}
         {active && savedRows.length ? <VisitGroup title="Saved on this phone" rows={savedRows} tone="info" hint="Waiting for a connection and server confirmation. Keep the app open; these visits are not verified yet." /> : null}
         {active && reviewRows.length ? <VisitGroup title="Awaiting review" rows={reviewRows} tone="warning" hint="Uploaded, but not yet verified. Your supervisor needs to review these visits." /> : null}

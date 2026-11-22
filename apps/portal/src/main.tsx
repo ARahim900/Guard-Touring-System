@@ -1,6 +1,7 @@
 // =============================================================================
 // Portal entry point: fonts, styles, crash reporting, routes.
 // =============================================================================
+import '@/lib/legacy';
 import '@fontsource-variable/dm-sans';
 import './index.css';
 
