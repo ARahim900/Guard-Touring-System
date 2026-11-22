@@ -67,9 +67,43 @@ export function BaseMap({ children, className, center, zoom, satellite = false }
       />
       </LayersControl.BaseLayer>
       </LayersControl>
+      <FollowSize />
       {children}
     </MapContainer>
   );
+}
+
+/**
+ * Leaflet measures its box once, when it is created. A map that opens inside a
+ * pop-up is created before the pop-up is shown, so it measured nothing and drew
+ * tiles for a small square only, leaving the rest blank. Re-measure whenever
+ * the box changes size.
+ */
+function FollowSize() {
+  const map = useMap();
+  useEffect(() => {
+    const box = map.getContainer();
+    if (typeof ResizeObserver === 'undefined') {
+      const timer = setTimeout(() => map.invalidateSize(), 300);
+      return () => clearTimeout(timer);
+    }
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
+/** Pans to a point when it changes and is outside the visible area (typed or "Use my location"). */
+export function KeepInView({ target, zoom = 18 }: { target: [number, number] | null; zoom?: number }) {
+  const map = useMap();
+  const lat = target?.[0];
+  const lng = target?.[1];
+  useEffect(() => {
+    if (lat === undefined || lng === undefined) return;
+    if (!map.getBounds().contains([lat, lng])) map.setView([lat, lng], Math.max(map.getZoom(), zoom));
+  }, [map, lat, lng, zoom]);
+  return null;
 }
 
 /** Zoom the map once so that all given points are visible. */

@@ -36,6 +36,8 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   build: {
+    // Older iPhones (iOS 15) still in use on site: write the code in a form they can run.
+    target: ['es2020', 'safari15', 'ios15'],
     sourcemap: true, // lets Sentry show real file/line numbers for errors
     chunkSizeWarningLimit: 1200,
   },

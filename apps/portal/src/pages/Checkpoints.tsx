@@ -12,7 +12,7 @@ import { Link } from 'react-router';
 import { toast } from 'sonner';
 
 import { CheckpointQrPreview } from '@/components/CheckpointQrPreview';
-import { BaseMap, CheckpointLayer, ClickToPick, FitBounds, icons } from '@/components/PatrolMap';
+import { BaseMap, CheckpointLayer, ClickToPick, FitBounds, icons, KeepInView } from '@/components/PatrolMap';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, Input, Modal, PageHeader, Spinner, Table, Td, Textarea } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
@@ -229,8 +229,9 @@ export default function CheckpointsPage() {
               ) : null}
             </div>
             <div>
-              <p className="mb-1 text-sm font-medium">Click the map to set the position</p>
-              <BaseMap satellite className="h-[420px] w-full rounded-md" center={hasPos ? [lat, lng] : undefined} zoom={hasPos ? 18 : undefined}>
+              <p className="mb-1 text-sm font-medium">Tap the map to set the position. Drag to move, pinch or use + and − to zoom.</p>
+              <BaseMap satellite className="h-[55vh] min-h-[320px] w-full rounded-md lg:h-[460px]" center={hasPos ? [lat, lng] : points[0]} zoom={hasPos ? 18 : points.length ? 16 : undefined}>
+                <KeepInView target={hasPos ? [lat, lng] : null} />
                 <ClickToPick onPick={(la, ln) => setForm((f) => f && { ...f, latitude: la.toFixed(7), longitude: ln.toFixed(7) })} />
                 {hasPos ? (
                   <>
