@@ -56,11 +56,26 @@ test('a retried upload keeps the first stored name', async () => {
   assert.deepEqual(rows.map((r) => r.guard_name), ['Salim']);
 });
 
-test('a name outside the guard list, or blank, is refused and nothing is saved', async () => {
+test('a scan saved offline still uploads after the guard list changes, and a retry after a lost reply succeeds', async () => {
   await asUser(guard);
   const id = randomUUID();
-  await assert.rejects(scanAs('Someone Else', id), /Choose your name/);
-  await assert.rejects(scanAs('  ', randomUUID()), /Choose your name/);
+  await scanAs('Hamed', id);
+  await db.exec('reset role');
+  await db.query("update public.app_settings set guard_names = array['Ali','Badr','Salim','Khalid'] where id = 1");
+  await asUser(guard);
+  const retried = (await scanAs('Hamed', id)).rows[0];
+  assert.equal(retried.id, id);
+  const offline = randomUUID();
+  await scanAs('Hamed', offline, cp2, 'POINT-TWO');
+  const { rows } = await db.query('select guard_name from public.scan_guard_names where scan_id = any($1::uuid[]) order by guard_name', [[id, offline]]);
+  assert.deepEqual(rows.map((r) => r.guard_name), ['Hamed', 'Hamed']);
+});
+
+test('a blank or overlong name is refused and nothing is saved', async () => {
+  await asUser(guard);
+  const id = randomUUID();
+  await assert.rejects(scanAs('  ', id), /Choose your name/);
+  await assert.rejects(scanAs('x'.repeat(81), randomUUID()), /Choose your name/);
   const { rows } = await db.query('select count(*)::int as n from public.scans where id = $1', [id]);
   assert.equal(rows[0].n, 0);
 });
@@ -78,5 +93,5 @@ test('the patrol report shows who scanned each visit', async () => {
   const { rows } = await db.query("select public.patrol_report('2026-09-10','2026-09-11') as r");
   const scans = rows[0].r.shifts.flatMap((s) => s.checkpoints.flatMap((c) => c.scans));
   assert.ok(scans.length >= 2);
-  assert.deepEqual([...new Set(scans.map((s) => s.scanned_by))].sort(), ['Badr', 'Salim']);
+  assert.deepEqual([...new Set(scans.map((s) => s.scanned_by))].sort(), ['Badr', 'Hamed', 'Salim']);
 });

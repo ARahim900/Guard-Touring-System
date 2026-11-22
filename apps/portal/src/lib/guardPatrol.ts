@@ -59,6 +59,8 @@ export async function submitReceipt(receipt: PatrolReceipt): Promise<ScanVerdict
   const { data, error } = await (receipt.guardName
     ? supabase.rpc('submit_scan_as', { p_guard_name: receipt.guardName, ...args })
     : supabase.rpc('submit_scan', args)).abortSignal(timeoutSignal(15000));
+  // PGRST202: the database update for named scans has not been applied yet.
+  if (error?.code === 'PGRST202') throw new Error('The server is not ready for named scans yet. Your scan is kept on this phone; tell your supervisor.');
   if (error) throw error;
   const result = data as Partial<ScanVerdict> | null;
   if (!result || !['valid', 'flagged', 'rejected'].includes(result.validation ?? '') || !result.server_time || !Array.isArray(result.flags)) {

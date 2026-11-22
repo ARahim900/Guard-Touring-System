@@ -169,7 +169,7 @@ export function csvCell(value: string | number | null): string {
 }
 
 export function buildReportCsv(report: PatrolReport): string {
-  const head = ['Shift date', 'Guard on duty', 'Guard ID', 'Login', 'Route', 'Patrol status', 'Scheduled start (Muscat)', 'Scheduled end (Muscat)', 'Actual start (Muscat)', 'Actual end (Muscat)', 'Automatically closed (Muscat)', 'Checkpoint', 'Location result', 'Scanned by', 'Scan count', 'Captured time (Muscat)', 'Server received (Muscat)', 'Latitude', 'Longitude', 'GPS accuracy (m)', 'Issue notes', 'Missing attachments', 'Generated at (Muscat)'];
+  const head = ['Shift date', 'Guard on duty', 'Guard ID', 'Login', 'Route', 'Patrol status', 'Scheduled start (Muscat)', 'Scheduled end (Muscat)', 'Actual start (Muscat)', 'Actual end (Muscat)', 'Automatically closed (Muscat)', 'Checkpoint', 'Location result', 'Scanned by (name chosen on phone)', 'Scan count', 'Captured time (Muscat)', 'Server received (Muscat)', 'Latitude', 'Longitude', 'GPS accuracy (m)', 'Issue notes', 'Missing attachments', 'Generated at (Muscat)'];
   const rows: (string | number | null)[][] = visitRows(report).map(({ shift: s, checkpoint: c, scan, status }) => [
     s.patrol_date, guardOnDuty(s), s.guard_ref, s.login_name, s.route_name, patrolResult(s),
     evidenceTime(s.scheduled_start, ''), evidenceTime(s.scheduled_end, ''), evidenceTime(s.actual_start, ''), evidenceTime(s.actual_end, ''),

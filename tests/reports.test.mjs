@@ -87,7 +87,7 @@ test('CSV shows who scanned each visit, and leaves it blank when it was not reco
     { id: 'b', name: 'B', sequence: 2, scans: [scanBy('s2', null)] },
   ] })]));
   const [head, first, second] = csv.replace('﻿', '').split('\r\n').map((line) => line.split('","'));
-  const col = head.indexOf('Scanned by');
+  const col = head.indexOf('Scanned by (name chosen on phone)');
   assert.ok(col > 0);
   assert.equal(first[col], 'Badr');
   assert.equal(second[col], '');

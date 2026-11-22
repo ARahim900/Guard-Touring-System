@@ -22,8 +22,11 @@ create policy "scan names: own or staff read" on public.scan_guard_names
     public.is_staff() or exists (select 1 from public.scans x where x.id = scan_id and x.guard_id = auth.uid())
   );
 
--- submit_scan plus the name of the guard holding the phone. A retried upload
--- keeps the name first stored for that scan.
+-- submit_scan plus the name of the guard holding the phone, as chosen on the
+-- phone from the guard list (a declaration on a shared login, not a sign-in).
+-- The name is not re-checked against the current guard list: a supervisor may
+-- edit the list while scans wait on a phone, and those scans must still
+-- upload. A retried upload keeps the name first stored for that scan.
 create function public.submit_scan_as(
   p_guard_name           text,
   p_scan_id              uuid,
@@ -46,7 +49,7 @@ declare
   v_name text := nullif(btrim(p_guard_name), '');
   v_row public.scans;
 begin
-  if v_name is null or not exists(select 1 from public.app_settings where id = 1 and v_name = any(guard_names)) then
+  if v_name is null or length(v_name) > 80 then
     raise exception 'Choose your name from the guard list' using errcode = '22023';
   end if;
   v_row := public.submit_scan(p_scan_id, p_shift_id, p_checkpoint_id, p_method, p_raw_value, p_status, p_note,
