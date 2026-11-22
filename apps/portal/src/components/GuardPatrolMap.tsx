@@ -1,16 +1,17 @@
 // =============================================================================
 // Map for guards: where each patrol location (and its QR label) is.
 // =============================================================================
-// Purple = still to scan, green = verified, amber = scanned but not verified yet
-// (saved on the phone or awaiting review). "Show where I am" reads the phone's
+// Each location is a coloured dot: purple = still to scan, green = verified,
+// amber = scanned but not verified yet (saved on the phone or awaiting review).
+// The name shows on hover or tap, so long names never crowd the map. "Show where I am" reads the phone's
 // position once, only to draw it here; it is not saved or sent anywhere.
 // =============================================================================
 import L from 'leaflet';
 import { Crosshair } from 'lucide-react';
 import { useState } from 'react';
-import { Circle, Marker, Popup } from 'react-leaflet';
+import { Circle, Marker, Popup, Tooltip } from 'react-leaflet';
 
-import { BaseMap, FitBounds, KeepInView } from '@/components/PatrolMap';
+import { BaseMap, dotIcon, FitBounds, KeepInView } from '@/components/PatrolMap';
 import { isPlaced } from '@/lib/geo';
 import type { PatrolCheckpoint } from '@/lib/guardPatrol';
 
@@ -19,15 +20,7 @@ export interface MyPosition { lat: number; lng: number; accuracy: number }
 
 const COLOUR: Record<PinState, string> = { todo: '#4E4456', done: '#0D5C38', waiting: '#8A5A00' };
 const STATE_TEXT: Record<PinState, string> = { todo: 'Still to scan', done: 'Verified', waiting: 'Scanned, not verified yet' };
-const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-const pin = (label: string, state: PinState) => L.divIcon({
-  className: '',
-  html: `<div style="transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center">
-    <div style="background:${COLOUR[state]};color:#fff;border-radius:8px;padding:3px 8px;font:600 14px 'DM Sans Variable',sans-serif;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3)">${state === 'done' ? '&#10003; ' : ''}${escape(label)}</div>
-    <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid ${COLOUR[state]}"></div></div>`,
-  iconSize: [0, 0],
-});
+const pinIcons = { todo: dotIcon(COLOUR.todo), done: dotIcon(COLOUR.done, true), waiting: dotIcon(COLOUR.waiting) };
 
 const me = L.divIcon({
   className: '',
@@ -78,7 +71,8 @@ export function GuardPatrolMap({ checkpoints, stateOf = defaultState, position, 
           {placed.map((c) => {
             const state = stateOf(c);
             return (
-              <Marker key={c.checkpoint_id} position={[c.latitude, c.longitude]} icon={pin(c.checkpoint_name, state)}>
+              <Marker key={c.checkpoint_id} position={[c.latitude, c.longitude]} icon={pinIcons[state]} title={c.checkpoint_name}>
+                <Tooltip direction="top" offset={[0, -14]}>{c.checkpoint_name}</Tooltip>
                 <Popup>
                   <strong>{c.checkpoint_name}</strong>
                   <br />

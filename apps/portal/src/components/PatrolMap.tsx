@@ -7,7 +7,7 @@
 // =============================================================================
 import L from 'leaflet';
 import { useEffect, type ReactNode } from 'react';
-import { Circle, LayersControl, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, LayersControl, MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 
 import { guardName } from '@/lib/labels';
 import type { Alarm, Checkpoint, LivePosition } from '@/lib/types';
@@ -21,6 +21,17 @@ export const DEFAULT_CENTER: [number, number] = [23.588, 58.383];
 export const DEFAULT_ZOOM = 12;
 
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/**
+ * A plain coloured dot for a location. Names stay off the map (they crowd it);
+ * they appear on hover (computer) or tap (phone). The transparent 44 px box
+ * around the dot keeps it easy to tap.
+ */
+export const dotIcon = (colour: string, done = false) => L.divIcon({
+  className: '',
+  html: `<div style="width:44px;height:44px;margin:-22px 0 0 -22px;display:flex;align-items:center;justify-content:center"><div style="width:22px;height:22px;border-radius:50%;background:${colour};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);color:#fff;font:700 12px sans-serif;display:flex;align-items:center;justify-content:center;box-sizing:border-box">${done ? '&#10003;' : ''}</div></div>`,
+  iconSize: [0, 0],
+});
 
 export const icons = {
   checkpoint: (label: string, done?: boolean) =>
@@ -125,7 +136,8 @@ export function CheckpointLayer({ checkpoints, doneIds }: { checkpoints: Checkpo
       {checkpoints.map((c) => (
         <span key={c.id}>
           <Circle center={[c.latitude, c.longitude]} radius={c.radius_m} pathOptions={{ color: '#4E4456', weight: 1, fillColor: '#A4C5BB', fillOpacity: 0.25 }} />
-          <Marker position={[c.latitude, c.longitude]} icon={icons.checkpoint(c.name, doneIds?.has(c.id))}>
+          <Marker position={[c.latitude, c.longitude]} icon={dotIcon(doneIds?.has(c.id) ? '#0D5C38' : '#4E4456', doneIds?.has(c.id))} title={c.name}>
+            <Tooltip direction="top" offset={[0, -14]}>{c.name}</Tooltip>
             <Popup>
               <strong>{c.name}</strong>
               <br />
