@@ -55,10 +55,9 @@ export async function submitReceipt(receipt: PatrolReceipt): Promise<ScanVerdict
     // Browsers do not expose Android's mock-location detector.
     p_is_mocked: null, p_expected_attachments: 0,
   };
-  // Scans saved before names were recorded upload without one.
-  const { data, error } = await (receipt.guardName
-    ? supabase.rpc('submit_scan_as', { p_guard_name: receipt.guardName, ...args })
-    : supabase.rpc('submit_scan', args)).abortSignal(timeoutSignal(15000));
+  // Scans saved before names were recorded upload without one; the server accepts that only for them.
+  const { data, error } = await supabase.rpc('submit_scan_as', { p_guard_name: receipt.guardName ?? null, ...args })
+    .abortSignal(timeoutSignal(15000));
   // PGRST202: the database update for named scans has not been applied yet.
   if (error?.code === 'PGRST202') throw new Error('The server is not ready for named scans yet. Your scan is kept on this phone; tell your supervisor.');
   if (error) throw error;

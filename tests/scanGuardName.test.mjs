@@ -13,9 +13,11 @@ async function asUser(id) {
   await db.query("select set_config('request.jwt.claim.sub', $1, false)", [id ?? '']);
   if (id) await db.exec('set role authenticated');
 }
-const scanAs = (name, id, checkpoint = cp1, code = 'POINT-ONE') => db.query(
-  `select (public.submit_scan_as($1,$2::uuid,$3::uuid,$4::uuid,'qr',$5,'normal',null,'2026-09-11T01:00:00+04:00'::timestamptz,now(),23.5,58.5,5,false,0)).*`,
-  [name, id, shift, checkpoint, code]);
+const scanAs = (name, id, checkpoint = cp1, code = 'POINT-ONE', time = '2026-09-11T01:00:00+04:00') => db.query(
+  `select (public.submit_scan_as($1,$2::uuid,$3::uuid,$4::uuid,'qr',$5,'normal',null,$6::timestamptz,now(),23.5,58.5,5,false,0)).*`,
+  [name, id, shift, checkpoint, code, time]);
+// Scan time after the "names required" switch-over.
+const afterSwitch = async () => (await db.query("select (named_scans_from + interval '1 minute')::text as t from public.app_settings where id = 1")).rows[0].t;
 
 before(async () => {
   db = new PGlite();
@@ -74,9 +76,27 @@ test('a scan saved offline still uploads after the guard list changes, and a ret
 test('a blank or overlong name is refused and nothing is saved', async () => {
   await asUser(guard);
   const id = randomUUID();
-  await assert.rejects(scanAs('  ', id), /Choose your name/);
+  await assert.rejects(scanAs('  ', id, cp1, 'POINT-ONE', await afterSwitch()), /Choose your name/);
   await assert.rejects(scanAs('x'.repeat(81), randomUUID()), /Choose your name/);
   const { rows } = await db.query('select count(*)::int as n from public.scans where id = $1', [id]);
+  assert.equal(rows[0].n, 0);
+});
+
+test('the old upload route without a name is closed to the apps', async () => {
+  await asUser(guard);
+  await assert.rejects(db.query(
+    `select public.submit_scan($1::uuid,$2::uuid,$3::uuid,'qr','POINT-ONE','normal',null,now(),now(),23.5,58.5,5,false,0)`,
+    [randomUUID(), shift, cp1]), /permission denied/);
+});
+
+test('a new scan without a name is refused; one saved on the phone before the switch-over still uploads, with no name stored', async () => {
+  await asUser(guard);
+  const fresh = randomUUID();
+  await assert.rejects(scanAs(null, fresh, cp1, 'POINT-ONE', await afterSwitch()), /Choose your name/);
+  const old = randomUUID();
+  const row = (await scanAs(null, old, cp2, 'POINT-TWO')).rows[0];
+  assert.equal(row.id, old);
+  const { rows } = await db.query('select count(*)::int as n from public.scan_guard_names where scan_id = any($1::uuid[])', [[fresh, old]]);
   assert.equal(rows[0].n, 0);
 });
 
@@ -93,5 +113,5 @@ test('the patrol report shows who scanned each visit', async () => {
   const { rows } = await db.query("select public.patrol_report('2026-09-10','2026-09-11') as r");
   const scans = rows[0].r.shifts.flatMap((s) => s.checkpoints.flatMap((c) => c.scans));
   assert.ok(scans.length >= 2);
-  assert.deepEqual([...new Set(scans.map((s) => s.scanned_by))].sort(), ['Badr', 'Hamed', 'Salim']);
+  assert.deepEqual([...new Set(scans.map((s) => s.scanned_by))].sort(), ['Badr', 'Hamed', 'Salim', null]); // null: saved on the phone before names were recorded
 });

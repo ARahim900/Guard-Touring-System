@@ -15,7 +15,7 @@ async function asUser(id) {
 }
 async function scan(id = randomUUID(), checkpoint = cp1, options = {}) {
   const values = [id, shift, checkpoint, checkpoint === cp1 ? 'POINT-ONE' : 'POINT-TWO', options.time ?? '2026-09-11T01:00:00+04:00', options.accuracy ?? 5, options.latitude ?? 23.5];
-  const result = await db.query(`select (public.submit_scan($1::uuid,$2::uuid,$3::uuid,'barcode',$4,'normal',null,$5::timestamptz,now(),$7,58.5,$6,false,0)).*`, values);
+  const result = await db.query(`select (public.submit_scan_as('Ali',$1::uuid,$2::uuid,$3::uuid,'barcode',$4,'normal',null,$5::timestamptz,now(),$7,58.5,$6,false,0)).*`, values);
   return result.rows[0];
 }
 
@@ -154,7 +154,7 @@ test('checkpoint alarms follow supervisor review decisions', async () => {
   const recentShift=randomUUID(), recentScan=randomUUID();
   await db.query("insert into public.shifts(id,guard_id,route_id,scheduled_start,scheduled_end,actual_start,status) values ($1,$2,$3,now()-interval '2 hours',now()-interval '1 hour',now()-interval '2 hours','active')",[recentShift,other,route]);
   await asUser(other);
-  await db.query("select public.submit_scan($1,$2,$3,'barcode','POINT-ONE','normal',null,now()-interval '90 minutes',now(),23.5,58.5,5,false,0)",[recentScan,recentShift,cp1]);
+  await db.query("select public.submit_scan_as('Ali',$1,$2,$3,'barcode','POINT-ONE','normal',null,now()-interval '90 minutes',now(),23.5,58.5,5,false,0)",[recentScan,recentShift,cp1]);
   await asUser(staff);
   await db.query("update public.scans set validation='flagged',review_note='Review required' where id=$1",[recentScan]);
   await asUser(null);
