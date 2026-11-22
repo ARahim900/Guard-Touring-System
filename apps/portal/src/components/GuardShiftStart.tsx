@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button, ErrorNote, Field, Select } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
+import { timeoutSignal } from '@/lib/timeoutSignal';
 
 /** Starts a patrol now; it runs for 12 hours (patrols have no fixed hours). */
 export function GuardShiftStart({ names, disabled, onStarted, title = 'Ready for your patrol?' }: {
@@ -17,7 +18,7 @@ export function GuardShiftStart({ names, disabled, onStarted, title = 'Ready for
     if (!name) { setError('Choose your name to start.'); return; }
     setSaving(true); setError(null);
     try {
-      const { data, error: startError } = await supabase.rpc('start_patrol_now', { p_on_duty_name: name, p_end: null }).abortSignal(AbortSignal.timeout(15000));
+      const { data, error: startError } = await supabase.rpc('start_patrol_now', { p_on_duty_name: name, p_end: null }).abortSignal(timeoutSignal(15000));
       if (startError) throw startError;
       if (!data) throw new Error('The shift was not confirmed. Please try again.');
       await onStarted();
