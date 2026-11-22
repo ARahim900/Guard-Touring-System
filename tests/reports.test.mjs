@@ -79,3 +79,16 @@ test('scan export cells neutralise spreadsheet formulas', () => {
   assert.equal(csvCell(-5),'"-5"');
   assert.equal(csvCell('Gate "A"'),'"Gate ""A"""');
 });
+
+test('CSV shows who scanned each visit, and leaves it blank when it was not recorded', () => {
+  const scanBy = (id, name) => ({ id, device_time: '2026-09-10T21:00:00Z', server_time: '2026-09-10T21:00:05Z', effective_time: '2026-09-10T21:00:00Z', validation: 'valid', latitude: 23.5, longitude: 58.5, accuracy_m: 5, distance_m: 2, status: 'normal', note: null, scanned_by: name, flags: [], review_note: null, expected_attachments: 0, attachment_count: 0 });
+  const csv = buildReportCsv(report([shift({ checkpoints: [
+    { id: 'a', name: 'A', sequence: 1, scans: [scanBy('s1', 'Badr')] },
+    { id: 'b', name: 'B', sequence: 2, scans: [scanBy('s2', null)] },
+  ] })]));
+  const [head, first, second] = csv.replace('﻿', '').split('\r\n').map((line) => line.split('","'));
+  const col = head.indexOf('Scanned by (name chosen on phone)');
+  assert.ok(col > 0);
+  assert.equal(first[col], 'Badr');
+  assert.equal(second[col], '');
+});

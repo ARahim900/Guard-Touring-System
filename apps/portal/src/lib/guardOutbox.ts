@@ -13,6 +13,8 @@ export interface PatrolReceipt {
   longitude: number;
   accuracy: number;
   /** 'issue' = the guard reported a problem at this location; the server opens an incident. */
+  /** The guard who made the scan (chosen on the phone). Older saved scans have none. */
+  guardName?: string;
   status?: 'normal' | 'issue';
   note?: string;
   state: 'pending' | 'synced';

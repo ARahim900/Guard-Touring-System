@@ -211,7 +211,7 @@ test('a fully verified round is closed when the next round starts; an open round
   const id=(await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id;
   assert.equal((await db.query("select public.start_patrol_now('Sample guard') as id")).rows[0].id,id);
   await assert.rejects(db.query("select public.start_patrol_now('Sample two')"),/already in progress/);
-  await db.query("select public.submit_scan($1,$2,$3,'qr','TEST-LOCATION','normal',null,public.test_now(),public.test_now(),0,0,5,false,0)",[randomUUID(),id,checkpoint]);
+  await db.query("select public.submit_scan_as('Ali',$1,$2,$3,'qr','TEST-LOCATION','normal',null,public.test_now(),public.test_now(),0,0,5,false,0)",[randomUUID(),id,checkpoint]);
   assert.equal((await db.query('select bool_and(completed) as done from public.shift_checkpoint_status where shift_id=$1',[id])).rows[0].done,true);
   const next=(await db.query("select public.start_patrol_now('Sample two') as id")).rows[0].id;
   assert.notEqual(next,id);

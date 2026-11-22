@@ -7,7 +7,7 @@ import { timeoutSignal } from '@/lib/timeoutSignal';
 
 /** Starts a patrol now; it runs for 12 hours (patrols have no fixed hours). */
 export function GuardShiftStart({ names, disabled, onStarted, title = 'Ready for your patrol?' }: {
-  names: string[]; disabled: boolean; onStarted: () => Promise<void>; title?: string;
+  names: string[]; disabled: boolean; onStarted: (name: string) => Promise<void>; title?: string;
 }) {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -21,7 +21,7 @@ export function GuardShiftStart({ names, disabled, onStarted, title = 'Ready for
       const { data, error: startError } = await supabase.rpc('start_patrol_now', { p_on_duty_name: name, p_end: null }).abortSignal(timeoutSignal(15000));
       if (startError) throw startError;
       if (!data) throw new Error('The shift was not confirmed. Please try again.');
-      await onStarted();
+      await onStarted(name);
     } catch (cause) { setError(friendlyError(cause)); }
     finally { setSaving(false); }
   }

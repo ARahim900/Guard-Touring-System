@@ -9,7 +9,7 @@
 // Every scan ends in a full-screen pop-up that says plainly whether the visit
 // counted.
 // =============================================================================
-import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Map as MapIcon, MessageSquareWarning, Navigation, RefreshCw, ScanLine } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, UserRound, ChevronRight, CloudUpload, FileText, LayoutDashboard, LogOut, Map as MapIcon, MessageSquareWarning, Navigation, RefreshCw, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router';
 import { GuardNavigation } from '@/components/GuardNavigation';
@@ -24,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/errors';
 import { captureLocation, type PatrolCheckpoint } from '@/lib/guardPatrol';
 import { readReceipts, saveReceipt, type PatrolReceipt } from '@/lib/guardOutbox';
+import { readScannerName, saveScannerName } from '@/lib/scannerName';
 import { scanFeedback } from '@/lib/scanFeedback';
 import { formatDateTime, formatTime } from '@/lib/time';
 import { useGuardPatrol } from '@/lib/useGuardPatrol';
@@ -54,6 +55,9 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const [reportNote, setReportNote] = useState('');
   const [reportError, setReportError] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
+  // Who is holding the phone: asked before the first scan each time the app opens.
+  const [scanner, setScannerState] = useState(() => readScannerName(userId));
+  const setScanner = (name: string | null) => { saveScannerName(userId, name); setScannerState(name); };
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const scanInProgress = useRef(false);
@@ -64,7 +68,9 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
   const checkpoints = snapshot?.checkpoints ?? [];
   const pending = receipts.filter((receipt) => receipt.state === 'pending');
   const inWindow = Boolean(shift && Date.now() >= Date.parse(shift.scheduled_start) && Date.now() <= Date.parse(shift.scheduled_end));
-  const canScan = active && inWindow && checkpoints.length > 0;
+  const guardNames = snapshot?.guardNames ?? [];
+  const scannerName = scanner && guardNames.includes(scanner) ? scanner : null;
+  const canScan = active && inWindow && checkpoints.length > 0 && scannerName !== null;
 
   const rows = checkpoints.map((checkpoint) => ({
     checkpoint,
@@ -132,6 +138,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
     const checkpoint = checkpoints.find((item) => item.code === code.trim());
     try {
       if (!shift || !active || !inWindow) throw new Error('Scanning is only available during your patrol.');
+      if (!scannerName) throw new Error('Choose your name before scanning.');
       if (!checkpoint) {
         setConfirm({ kind: 'notice', tone: 'danger', title: 'Not one of tonight’s locations', message: 'This QR code is not on your patrol. Scan the QR label fixed at the location.' });
         return;
@@ -155,6 +162,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         id: crypto.randomUUID(), userId, shiftId: shift.id, checkpointId: checkpoint.checkpoint_id,
         checkpointName: checkpoint.checkpoint_name, code: code.trim(), method, deviceTime,
         latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, state: 'pending',
+        guardName: scannerName,
         ...(issue ? { status: 'issue' as const, note: issue.note } : {}),
       };
       await saveReceipt(receipt);
@@ -189,7 +197,13 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
             <Link to="/reports" aria-label="Daily reports" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10"><FileText className="size-5" aria-hidden="true" /></Link>
             <button type="button" onClick={() => void leave()} disabled={overlay || syncing} aria-label="Sign out" className="flex size-11 items-center justify-center rounded-full text-white/90 hover:bg-white/10 disabled:opacity-50"><LogOut className="size-5" aria-hidden="true" /></button>
           </div>
-          <p className="mt-2 break-words text-sm text-white">{active ? shift.on_duty_name ?? fullName : fullName}</p>
+          {active ? (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="flex items-center gap-1.5 break-words text-sm font-semibold text-white"><UserRound className="size-4 shrink-0" aria-hidden="true" />{scannerName ? `Scanning: ${scannerName}` : 'Choose who is scanning'}</p>
+              {scannerName ? <button type="button" onClick={() => setScanner(null)} disabled={overlay} className="min-h-11 text-sm text-white/90 underline disabled:opacity-50">Change</button> : null}
+              {shift.on_duty_name && shift.on_duty_name !== scannerName ? <p className="w-full text-sm text-white/80">Patrol started by {shift.on_duty_name}</p> : null}
+            </div>
+          ) : <p className="mt-2 break-words text-sm text-white">{fullName}</p>}
           {active ? <p className="mt-1 text-sm text-white/90">Ends automatically: {formatDateTime(shift.scheduled_end)} · Muscat</p> : null}
           {active && checkpoints.length ? (
             <div className="mt-4 flex items-center gap-4 rounded-2xl bg-white/10 px-4 py-3">
@@ -215,7 +229,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
           </div>
         ) : null}
 
-        {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async () => { await refresh(true); setScanning(null); }} /> : null}
+        {!active ? <GuardShiftStart key={shift?.id ?? 'new'} names={snapshot?.guardNames ?? []} disabled={!snapshot || cached || syncing || pending.length > 0 || checkpoints.length === 0} onStarted={async (name) => { setScanner(name); await refresh(true); setScanning(null); }} /> : null}
         {active && !inWindow ? <p role="status" className="rounded-xl bg-muted px-4 py-3 text-sm">This patrol has ended. Tap Refresh to load the next one.</p> : null}
         {(error || cached || (active && !inWindow)) && !pending.length ? (
           <button type="button" onClick={() => void refresh(true)} disabled={syncing} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-medium text-primary disabled:opacity-50"><RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />Refresh</button>
@@ -229,7 +243,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
               </div>
               {!newRound ? <button type="button" onClick={() => setNewRound(true)} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-success-text text-base font-semibold text-white"><RefreshCw className="size-5" aria-hidden="true" />Start a new round</button> : null}
             </div>
-            {newRound ? <GuardShiftStart key="new-round" title="Start a new round" names={snapshot?.guardNames ?? []} disabled={!snapshot || cached || syncing || pending.length > 0} onStarted={async () => { setNewRound(false); await refresh(true); setScanning(null); }} /> : null}
+            {newRound ? <GuardShiftStart key="new-round" title="Start a new round" names={snapshot?.guardNames ?? []} disabled={!snapshot || cached || syncing || pending.length > 0} onStarted={async (name) => { setScanner(name); setNewRound(false); await refresh(true); setScanning(null); }} /> : null}
           </>
         ) : active && checkpoints.length > 0 && !toVisit.length ? (
           <div role="status" className="flex items-center gap-3 rounded-2xl bg-warning-bg px-5 py-4 text-warning-text">
@@ -239,6 +253,7 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
         ) : null}
 
         {!checkpoints.length ? <p className="rounded-xl bg-muted px-4 py-3">Your manager needs to add the patrol locations.</p> : null}
+        {active && inWindow && !scannerName ? <WhoIsScanning names={guardNames} startedBy={shift.on_duty_name} onChoose={setScanner} /> : null}
         {active && issue ? (
           <div role="status" className="rounded-2xl border border-warning bg-warning-bg px-4 py-3 text-warning-text">
             <p className="font-semibold">Problem report for {issue.name} is ready</p>
@@ -322,6 +337,26 @@ function GuardTour({ userId, fullName, footer }: { userId: string; fullName: str
 }
 
 type Row = { checkpoint: PatrolCheckpoint; status: Status };
+
+/** The guard holding the phone picks their name; every scan is recorded under it. */
+function WhoIsScanning({ names, startedBy, onChoose }: { names: string[]; startedBy: string | null; onChoose: (name: string) => void }) {
+  const [name, setName] = useState('');
+  return (
+    <section aria-labelledby="who-is-scanning" className="space-y-4 rounded-2xl border-2 border-primary bg-card p-5">
+      <div>
+        <h2 id="who-is-scanning" className="text-xl">Who is scanning?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Choose your name before you scan. Every scan is recorded under it.{startedBy ? ` This patrol was started by ${startedBy}.` : ''}</p>
+      </div>
+      <Field label="Your name">
+        <Select className="min-h-12 text-base" value={name} onChange={(event) => setName(event.target.value)}>
+          <option value="">Choose your name</option>
+          {names.map((guard) => <option key={guard} value={guard}>{guard}</option>)}
+        </Select>
+      </Field>
+      <Button className="min-h-14 w-full rounded-2xl text-lg font-semibold" icon={UserRound} disabled={!name} onClick={() => onChoose(name)}>Continue</Button>
+    </section>
+  );
+}
 
 function ProgressRing({ done, total }: { done: number; total: number }) {
   const r = 26;

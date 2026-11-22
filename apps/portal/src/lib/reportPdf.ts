@@ -244,7 +244,7 @@ export function buildReportPdf(report: PatrolReport, logoUrl: string | null = nu
       ...table,
       startY: y + 5,
       head: [['No.', 'Location', 'Result', 'Scanned at', 'Scans', 'GPS position', 'Accuracy', 'Notes']],
-      body: visits.map((r, i) => [String(i + 1), r.checkpoint.name, r.status, at(r.scan?.device_time ?? null), String(r.checkpoint.scans.length),
+      body: visits.map((r, i) => [String(i + 1), r.checkpoint.name, r.status, `${at(r.scan?.device_time ?? null)}${r.scan?.scanned_by ? `\nby ${r.scan.scanned_by}` : ''}`, String(r.checkpoint.scans.length),
         coordinates(r.scan), accuracy(r.scan), visitNotes(r)]),
       columnStyles: { 0: { cellWidth: 9, halign: 'center' }, 1: { cellWidth: 44 }, 2: { cellWidth: 22 }, 3: { cellWidth: 22 }, 4: { cellWidth: 13, halign: 'center' }, 5: { cellWidth: 28 }, 6: { cellWidth: 19 } },
       didParseCell: colourResult(2),

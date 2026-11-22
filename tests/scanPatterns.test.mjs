@@ -47,7 +47,7 @@ async function shiftVisiting(...names) {
 async function scan({ shift, guard }, name, time, position = points[name]) {
   await asUser(guard);
   const { rows } = await db.query(
-    `select (public.submit_scan($1,$2,$3,'qr',$4,'normal',null,$5::timestamptz,public.test_now(),$6,$7,5,false,0)).*`,
+    `select (public.submit_scan_as('Ali',$1,$2,$3,'qr',$4,'normal',null,$5::timestamptz,public.test_now(),$6,$7,5,false,0)).*`,
     [randomUUID(), shift, points[name].id, `PATTERN-${name}`, at(time), position.lat, position.lng]);
   return rows[0];
 }
